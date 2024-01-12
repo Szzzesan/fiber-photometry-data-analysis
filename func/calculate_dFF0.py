@@ -31,10 +31,10 @@ def calculate_dFF0(raw_separated, session_label, save_path, plot='False',
     if plot:
         plt.style.use('ggplot')
         for i in range(len(dFF0.columns) - 1):
-            plt.plot(dFF0.iloc[10000:15000, 0], dFF0.iloc[10000:15000, i + 1], label=dFF0.columns.values[i + 1])
+            plt.plot(dFF0.iloc[10000:15000, 0], dFF0.iloc[10000:15000, i + 1] * 100, label=dFF0.columns.values[i + 1])
         plt.legend()
         plt.xlabel('Time recording (sec)')
-        plt.ylabel('dF/F0')
+        plt.ylabel('dF/F0 (%)')
         plt.title(session_label + " dF/F0")
         fig = plt.gcf()
         plt.show()

@@ -79,8 +79,11 @@ def add_2ndry_properties_to_pi_events(pi_events):
             next_idx = reward_idx[i + 1]
         isafter = pi_events.index > idx
         islick = pi_events.key == 'lick'
-        first_lick_idx = pi_events[isafter & islick & (pi_events.value == 1)].index[0]
-        pi_events.is_1st_lick[first_lick_idx] = 1
+        if pi_events[isafter & islick & (pi_events.value == 1)].empty:
+            print('no lick after this reward hence no first lick')
+        else:
+            first_lick_idx = pi_events[isafter & islick & (pi_events.value == 1)].index[0]
+            pi_events.is_1st_lick[first_lick_idx] = 1
         if (pi_events.value[isafter & islick].iloc[0] == 0) & (pi_events.index[isafter & islick].min() < next_idx):
             pi_events.is_1st_encounter[idx] = 1
         elif pi_events.value[isafter & islick].iloc[0] == 1:

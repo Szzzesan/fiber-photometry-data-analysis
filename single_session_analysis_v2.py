@@ -28,8 +28,8 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
     func.check_framedrop(neural_events)
     raw_separated = func.de_interleave(neural_events, session_label=signal_dir[-23:-7], plot=0, save=0,
                                        save_path=fig_export_dir)
-    dFF0 = func.calculate_dFF0(raw_separated, session_label=signal_dir[-23:-7], plot=0,
-                               plot_middle_steps=0, save=0, save_path=fig_export_dir)
+    dFF0 = func.calculate_dFF0(raw_separated, session_label=signal_dir[-23:-7], plot=1,
+                               plot_middle_steps=1, save=1, save_path=fig_export_dir)
     dFF0.name = 'dFF0'
     func.export_df_to_csv(dFF0, fp_export_dir)
     # endregion
@@ -39,7 +39,6 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
     pi_events = func.data_reduction(pi_events, lick_tol=.01, head_tol=0.2)
     pi_events = func.add_2ndry_properties_to_pi_events(pi_events)
     pi_events.reset_index(drop=True, inplace=True)
-
 
     # region Extract behavior events without trial structures
     non_trial_events = func.extract_behavior_events(pi_events)
@@ -70,6 +69,7 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
     #                             filter_intervals=big_interval_for_reward1,
     #                             plot_interval=[-2, 10], save=0, save_path=fig_export_dir)
     # endregion
+
     # # region plot the reward-to-reward heatmaps
     # filter_for_reward1 = func.get_filter_intervals(structured_events, 'exp_entry', 'exp_reward_2')
     # filter_for_reward2 = func.get_filter_intervals(structured_events, 'exp_reward_1', 'exp_reward_3')
@@ -122,23 +122,47 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
 
     # endregion
     # region II. trial-by-trial analysis
-    transient_left = func.extract_transient_info('green_left', dFF0, pi_events, plot=0)
-    transient_right = func.extract_transient_info('green_right', dFF0, pi_events, plot=0)
-    r_left = func.visualize_trial_by_trial(transient_left, dFF0, 'green_left')
-    r_right = func.visualize_trial_by_trial(transient_right, dFF0, 'green_right')
+    transient_right = func.extract_transient_info('green_right', dFF0, pi_events, plot_zscore=0, plot=0)
+    transient_left = func.extract_transient_info('green_left', dFF0, pi_events, plot_zscore=0, plot=0)
+    # r_right = func.visualize_trial_by_trial(transient_right, dFF0, 'green_right')
+    # r_left = func.visualize_trial_by_trial(transient_left, dFF0, 'green_left')
+
     # endregion
     print("Finish analyzing" + " session " + signal_filename[-23:-4])
+    median_transient_rt = transient_right['height'].median()
+    median_transient_lft = transient_left['height'].median()
+    return [median_transient_rt, median_transient_lft]
 
 
 if __name__ == '__main__':
     lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
-    animal_str = 'SZ035'
+    animal_str = 'SZ036'
     animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
     raw_dir = os.path.join(animal_dir, 'raw_data')
     FP_file_list = func.list_files_by_time(raw_dir, file_type='FP', print_names=0)
     behav_file_list = func.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
     TTL_file_list = func.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
-    for session in range(8, 9):
+    num_session = len(TTL_file_list)
+    median_peakheight_list_rt = np.empty(num_session)
+    median_peakheight_list_lft = np.empty(num_session)
+    for session in range(0, num_session):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            single_session_analysis(animal_dir, FP_file_list[session], TTL_file_list[session], behav_file_list[session])
+            [median_peakheight_rt, median_peakheight_lft] = single_session_analysis(animal_dir, FP_file_list[session],
+                                                                                    TTL_file_list[session],
+                                                                                    behav_file_list[session])
+            median_peakheight_list_rt[session] = median_peakheight_rt
+            median_peakheight_list_lft[session] = median_peakheight_lft
+
+    across_session_save_path = os.path.join(animal_dir, 'figures')
+    fig_name = os.path.join(across_session_save_path, 'signal_strength' + '.png')
+    plt.style.use('ggplot')
+    plt.plot(median_peakheight_list_rt * 100, label='right')
+    plt.plot(median_peakheight_list_lft * 100, label='left')
+    plt.xlabel('Session')
+    plt.ylabel('Median dF/F0 (%)')
+    plt.title('Signal strength across session')
+    plt.legend()
+    plt.show()
+    fig = plt.gcf()
+    fig.savefig(fig_name)

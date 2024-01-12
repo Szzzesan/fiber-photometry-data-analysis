@@ -12,12 +12,12 @@ def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0):
     # sns.swarmplot(data=df_to_swarm.melt(), x='variable', y='value')
     # plt.show()
 
-    plt.style.use('ggplot')
-    sns.swarmplot(data=df_to_swarm, x='Interval Type', y='Duration (sec)', size=3, alpha=0.6)
-    # sns.boxplot(data=df_to_swarm, x='Interval Type', y='Duration (sec)', boxprops={"facecolor": 'none'}, showcaps=0, notch=1,
-    #             fliersize=0)
-    sns.violinplot(data=df_to_swarm, x='Interval Type', y='Duration (sec)', color='powderblue', saturation=0, scale='count')
-    plt.show()
+    # plt.style.use('ggplot')
+    # sns.swarmplot(data=df_to_swarm, x='Interval Type', y='Duration (sec)', size=3, alpha=0.6)
+    # # sns.boxplot(data=df_to_swarm, x='Interval Type', y='Duration (sec)', boxprops={"facecolor": 'none'}, showcaps=0, notch=1,
+    # #             fliersize=0)
+    # sns.violinplot(data=df_to_swarm, x='Interval Type', y='Duration (sec)', color='powderblue', saturation=0, scale='count')
+    # plt.show()
 
     # plt.style.use('ggplot')
     # transient_plot = transient[(~transient['r2p'].isna()) & (transient.port == 1)]
@@ -45,14 +45,14 @@ def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0):
     # plt.show()
 
     transient_plot = transient[(~transient['r2p'].isna()) & (transient.port == 1)]
-    transient_plot = transient_plot[transient_plot.is_1st_reward]
+    # transient_plot = transient_plot[transient_plot.is_1st_reward]
     # region Temporary data clipping - only applicable for one session
-    condition1 = (transient_plot.trial == 7) & (transient_plot.is_1st_reward)
-    condition2 = (transient_plot.trial == 20) & (transient_plot.is_1st_reward)
-    transient_plot = transient_plot[(~condition1) & (~condition2)]
+    # condition1 = (transient_plot.trial == 7) & (transient_plot.is_1st_reward)
+    # condition2 = (transient_plot.trial == 20) & (transient_plot.is_1st_reward)
+    # transient_plot = transient_plot[(~condition1) & (~condition2)]
     # endregion
     fig, ax = plt.subplots()
-    sns.scatterplot(data=transient_plot, x='ts_reward', y='height', hue='block', palette='Set2', marker='x', legend=None)
+    sns.scatterplot(data=transient_plot, x='ts_reward', y='height', hue='block', palette='Set2', legend=None)
     x_1 = transient_plot['ts_reward'].to_numpy().reshape(-1,1)
     y = transient_plot['height'].to_numpy().reshape(-1,1)
     huber_r = HuberRegressor(alpha=0.0001, epsilon=1).fit(x_1, y)
@@ -61,8 +61,8 @@ def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0):
     plt.plot(x_1, estimated_y)
     ax.set_xlabel('Time since Last Reward (sec)')
     ax.set_ylabel('Peak Height')
-    ax.set_xlim([0, 10])
-    ax.set_ylim([0.008, 0.1])
+    ax.set_xlim([0, 7])
+    ax.set_ylim([0.008, 0.06])
     ax.set_facecolor("white")
     ax.spines['left'].set_color('dimgrey')
     ax.spines['bottom'].set_color('dimgrey')
@@ -79,14 +79,13 @@ def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0):
     plt.plot(x_2, estimated_y)
     plt.xlabel('Time since Entry (sec)')
     plt.ylabel('Peak Height')
-    plt.xlim([0, 15])
-    plt.ylim([0.008, 0.1])
+    plt.xlim([0, 7])
+    plt.ylim([0.008, 0.06])
     ax.set_facecolor("white")
     ax.spines['left'].set_color('dimgrey')
     ax.spines['bottom'].set_color('dimgrey')
     plt.grid(False)
     plt.show()
-    print('Hello')
     return r2_reward
     # fig, ax = plt.subplots()
     # sns.scatterplot(data=transient_plot, x='ts_entry_or_reward', y='height', hue='block', palette='Set2', style='is_1st_reward', legend=None)

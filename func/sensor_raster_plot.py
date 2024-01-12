@@ -13,7 +13,10 @@ def find_inner_interval(interval1, interval2):
     else:
         l = max(interval1[0], interval2[0])
         r = min(interval1[1], interval2[1])
-        return [l, r]
+        if l < r:
+            return [l, r]
+        else:
+            return np.nan
 
 
 def order_of_trial(df, trial):
@@ -75,7 +78,13 @@ def get_signal_per_bin(signal_data, branch, aligner_event_time, plot_interval, f
     df = df.drop(['time_aligned', 'time_recording'], axis=1)
     grouped = df.groupby(['time_bin']).mean()
     time_label = bins[:-1]
-    inner_interval = find_inner_interval(plot_interval, filter_interval - aligner_event_time)
+    if filter_interval is None:
+        inner_interval = plot_interval
+    else:
+        if (filter_interval[0] < aligner_event_time < filter_interval[1]):
+            inner_interval = find_inner_interval(plot_interval, filter_interval - aligner_event_time)
+        else:
+            inner_interval = np.nan
     if ~np.isnan(inner_interval).any():
         binned_dFF0 = pd.DataFrame({'time': time_label, 'dFF0': grouped.dFF0.values})
         indices_in_range = np.where(
@@ -91,29 +100,19 @@ def get_signal_per_bin(signal_data, branch, aligner_event_time, plot_interval, f
 
 def get_heatmap_matrix(dFF0, pi_events, condition, branch, plot_interval, filter_intervals,
                        bin_size=1 / 30, sort='False', sort_direction='before'):
-    # col_name = port + '_' + aligned_by
-    # event_time_series = pi_trials[col_name]
-    # dFF0_for_heatmap = pd.DataFrame(columns=['time', 'dFF0', 'trial'])
-    # for i in range(0, len(pi_trials.index)):
-    #     if (len(event_time_series.iloc[i]) > sequence) & (len(event_time_series.iloc[i]) > 0):
-    #         event_time = event_time_series.iloc[i][sequence]
-    #     else:
-    #         event_time = np.nan
-    #     binned_dFF0 = get_signal_per_bin(dFF0, branch, event_time, plot_interval=plot_interval,
-    #                                      filter_interval=filter_intervals[i, :], bin_size=bin_size)
-    #     if len(binned_dFF0.index) > 0:
-    #         binned_dFF0['trial'] = pi_trials.trial[i]
-    #     dFF0_for_heatmap = pd.concat([dFF0_for_heatmap, binned_dFF0], axis=0)
-
     event_rows = pi_events[condition].reset_index(drop=True)
     dFF0_for_heatmap = pd.DataFrame(columns=['time', 'dFF0', 'trial'])
     for i in range(len(event_rows)):
         event_time = event_rows.time_recording[i]
-        binned_dFF0 = get_signal_per_bin(dFF0, branch, event_time, plot_interval=plot_interval,
-                                         filter_interval=filter_intervals[i, :], bin_size=bin_size)
-        if len(binned_dFF0.index) > 0:
-            binned_dFF0['trial'] = event_rows.trial[i]
-        dFF0_for_heatmap = pd.concat([dFF0_for_heatmap, binned_dFF0], axis=0)
+        in_range_bool = [filter_intervals[j][0] < event_time < filter_intervals[j][1] for j in
+                         range(len(filter_intervals))]
+        interval_idx = [i for i, x in enumerate(in_range_bool) if x]
+        if len(interval_idx) > 0:
+            binned_dFF0 = get_signal_per_bin(dFF0, branch, event_time, plot_interval=plot_interval,
+                                             filter_interval=filter_intervals[interval_idx][0], bin_size=bin_size)
+            if len(binned_dFF0.index) > 0:
+                binned_dFF0['trial'] = event_rows.trial[i]
+            dFF0_for_heatmap = pd.concat([dFF0_for_heatmap, binned_dFF0], axis=0)
 
     dFF0_for_heatmap.dFF0 = dFF0_for_heatmap.dFF0.astype(float)
     dFF0_for_heatmap = dFF0_for_heatmap.pivot_table(index='trial', columns='time', values='dFF0')

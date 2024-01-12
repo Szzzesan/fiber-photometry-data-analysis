@@ -75,11 +75,11 @@ def extract_trial(pi_events_df):
     pi_trials["num_bg_reentries"] = num_bg_exits - 1
     pi_trials["num_exp_reentries"] = num_exp_exits - 1
     valid_exp_entry, valid_exp_exit, leave_times = get_leave_times(pi_events_df)
-    pi_trials["leave_time"] = leave_times
-    pi_trials['valid_exp_entry'] = valid_exp_entry.time_recording
-    pi_trials['valid_exp_exit'] = valid_exp_exit.time_recording
-    pi_trials['valid_bg_entry'] = valid_bg_entry
-    pi_trials['valid_bg_exit'] = valid_bg_exit
+    pi_trials["leave_time"] = leave_times[0:num_trial]
+    pi_trials['valid_exp_entry'] = valid_exp_entry.time_recording[0:num_trial]
+    pi_trials['valid_exp_exit'] = valid_exp_exit.time_recording[0:num_trial]
+    pi_trials['valid_bg_entry'] = valid_bg_entry[0:num_trial]
+    pi_trials['valid_bg_exit'] = valid_bg_exit[0:num_trial]
     # endregion
 
     return pi_trials
