@@ -25,7 +25,7 @@ def de_interleave(neural_events, session_label, save_path, plot='False', save='F
                      label=raw_neural_deinterleaved.columns.values[2 * i + 1])
             plt.plot(raw_neural_deinterleaved.iloc[:, 0], raw_neural_deinterleaved.iloc[:, 2 * (i + 1)],
                      label=raw_neural_deinterleaved.columns.values[2 * (i + 1)])
-        plt.legend()
+        # plt.legend()
         plt.title(session_label + ' raw deinterleaved')
         fig = plt.gcf()
         plt.show()

@@ -17,7 +17,7 @@ def butterworth_detrend(raw_separated, session_label, fps=80, plot='False'):
             plt.plot(detrended.iloc[:, 0], detrended.iloc[:, i + 1], label=raw_separated.columns.values[i + 1])
 
     if plot:
-        plt.legend()
+        # plt.legend()
         plt.title(session_label + ' signals after butterworth highpass filter')
         plt.show()
 

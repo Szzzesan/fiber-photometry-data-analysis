@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+import numpy as np
 
 
 def lin_reg_fit(denoised_df, session_label, plot='False'):
@@ -8,7 +9,10 @@ def lin_reg_fit(denoised_df, session_label, plot='False'):
     for i in range(num_color_site):
         x = denoised_df.iloc[:, (i + 1) * 2].to_numpy().reshape(-1, 1)  # x - isosbestic
         y = denoised_df.iloc[:, i * 2 + 1].to_numpy().reshape(-1, 1)  # y - actual
-        reg = LinearRegression().fit(x, y)
+        y_90 = np.percentile(y, 90)
+        y_without_outliers = y[y < y_90]
+        x_without_outliers = x[np.where(y < y_90)[0]]
+        reg = LinearRegression().fit(x_without_outliers, y_without_outliers)
         fitted_isos = reg.predict(x)
         fitted_df.iloc[:, (i + 1) * 2] = fitted_isos
 
@@ -19,7 +23,7 @@ def lin_reg_fit(denoised_df, session_label, plot='False'):
                      label=fitted_df.columns.values[i * 2 + 1])
             plt.plot(fitted_df.iloc[10000:15000, 0], fitted_df.iloc[10000:15000, (i + 1) * 2],
                      label=fitted_df.columns.values[(i + 1) * 2])
-        plt.legend()
+        # plt.legend()
         plt.xlabel('Time recording (msec)')
         plt.ylabel('Fluorescence intensity')
         plt.title(session_label + ' After linear regression fitting')

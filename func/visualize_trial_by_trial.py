@@ -3,12 +3,47 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import statistics
 import pandas as pd
-from sklearn.linear_model import HuberRegressor
+from sklearn.linear_model import LinearRegression
+import os
 from sklearn.metrics import r2_score
 
 
-def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0):
-    df_to_swarm = transient[['n2p', 'p2n', 'r2p', 'p2r', 'r2p2r', 'e2p', 'l2p', 'p2l', 'x2p', 'p2x']].copy().melt(var_name='Interval Type', value_name='Duration (sec)')
+def plot_DA_correlated_with_duration(transient_df, x_col_name, y_col_name, x_label, y_label, xlim, ylim, title,
+                                     left_or_right, save_path, save_name, plot=0, save=0):
+    fig, ax = plt.subplots()
+    sns.scatterplot(data=transient_df, x=x_col_name, y=y_col_name, hue='block', palette='Set2', legend=None)
+    x = transient_df[x_col_name].to_numpy().reshape(-1, 1)
+    y = transient_df[y_col_name].to_numpy().reshape(-1, 1)
+    reg = LinearRegression().fit(x, y)
+    estimated_y = reg.predict(x)
+    r2 = reg.score(x, y)
+    plt.plot(x, estimated_y)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_xlim(xlim)
+    # ax.set_ylim(ylim)
+    ax.set_facecolor("white")
+    ax.spines['left'].set_color('dimgrey')
+    ax.spines['bottom'].set_color('dimgrey')
+    plt.grid(False)
+    plt.title(title)
+    if plot:
+        fig.show()
+    if save:
+        isExist = os.path.exists(save_path)
+        if not isExist:
+            # Create a new directory because it does not exist
+            os.makedirs(save_path)
+            print("A new directory is created!")
+        fig_name = os.path.join(save_path, save_name + '_' + left_or_right + '.png')
+        fig.savefig(fig_name)
+    return r2
+
+
+def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0, session_label, save_path, left_or_right, plot=0,
+                             save=0):
+    df_to_swarm = transient[['n2p', 'p2n', 'r2p', 'p2r', 'r2p2r', 'e2p', 'l2p', 'p2l', 'x2p', 'p2x']].copy().melt(
+        var_name='Interval Type', value_name='Duration (sec)')
     # sns.swarmplot(data=df_to_swarm.melt(), x='variable', y='value')
     # plt.show()
 
@@ -19,87 +54,162 @@ def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0):
     # sns.violinplot(data=df_to_swarm, x='Interval Type', y='Duration (sec)', color='powderblue', saturation=0, scale='count')
     # plt.show()
 
-    # plt.style.use('ggplot')
-    # transient_plot = transient[(~transient['r2p'].isna()) & (transient.port == 1)]
-    # sns.scatterplot(data=transient_plot, x='ts_reward', y='height', palette='Set2', style='is_1st_reward')
-    # plt.xlabel('Time since Last Reward (sec)')
-    # plt.ylabel('Peak Height')
-    # plt.xlim([0, 10])
-    # plt.ylim([0.008, 0.1])
-    # plt.show()
-    #
-    # plt.style.use('ggplot')
-    # sns.scatterplot(data=transient_plot, x='ts_entry', y='height', palette='Set2', style='is_1st_reward')
-    # plt.xlabel('Time since Entry (sec)')
-    # plt.ylabel('Peak Height')
-    # plt.xlim([0, 10])
-    # plt.ylim([0.008, 0.1])
-    # plt.show()
-    #
-    # plt.style.use('ggplot')
-    # sns.scatterplot(data=transient_plot, x='ts_entry_or_reward', y='height', palette='Set2', style='is_1st_reward')
-    # plt.xlabel('Time since Entry/Reward (sec)')
-    # plt.ylabel('Peak Height')
-    # plt.xlim([0, 10])
-    # plt.ylim([0.008, 0.1])
-    # plt.show()
-
     transient_plot = transient[(~transient['r2p'].isna()) & (transient.port == 1)]
+    transient_plot['height'] = transient_plot['height'] * 100
     # transient_plot = transient_plot[transient_plot.is_1st_reward]
-    # region Temporary data clipping - only applicable for one session
-    # condition1 = (transient_plot.trial == 7) & (transient_plot.is_1st_reward)
-    # condition2 = (transient_plot.trial == 20) & (transient_plot.is_1st_reward)
-    # transient_plot = transient_plot[(~condition1) & (~condition2)]
+    # region Temporary data cleaning
+    transient_plot = transient_plot[transient_plot['num_reward_in_halfsec_before'] < 2]
+    transient_plot = transient_plot[transient_plot['num_reward_in_halfsec_after'] < 2]
+    transient_plot = transient_plot[transient_plot['is_from_valid_trial']]
+    # transient_plot = transient_plot[transient_plot['ts_reward'] < 8.5]
+    # transient_plot = transient_plot[transient_plot['ts_entry_or_reward'] < 8.5]
+    # transient_plot = transient_plot[transient_plot['tt_exit'] < 8.5]
     # endregion
-    fig, ax = plt.subplots()
-    sns.scatterplot(data=transient_plot, x='ts_reward', y='height', hue='block', palette='Set2', legend=None)
-    x_1 = transient_plot['ts_reward'].to_numpy().reshape(-1,1)
-    y = transient_plot['height'].to_numpy().reshape(-1,1)
-    huber_r = HuberRegressor(alpha=0.0001, epsilon=1).fit(x_1, y)
-    estimated_y = huber_r.predict(x_1)
-    r2_reward = r2_score(y, estimated_y)
-    plt.plot(x_1, estimated_y)
-    ax.set_xlabel('Time since Last Reward (sec)')
-    ax.set_ylabel('Peak Height')
-    ax.set_xlim([0, 7])
-    ax.set_ylim([0.008, 0.06])
-    ax.set_facecolor("white")
-    ax.spines['left'].set_color('dimgrey')
-    ax.spines['bottom'].set_color('dimgrey')
-    plt.grid(False)
-    fig.show()
+    # region all rewards
+    r2_R = plot_DA_correlated_with_duration(transient_plot, x_col_name='ts_reward', y_col_name='height',
+                                                 x_label='Reward Time since Last Reward (sec)',
+                                                 y_label='Peak Height (dF/F0 in %)',
+                                                 xlim=[0, 8.5], ylim=[0, 6],
+                                                 title=session_label + ' ' + left_or_right + ' DA ~ IRI',
+                                                 left_or_right=left_or_right, save_path=save_path,
+                                                 save_name='DA-IRI',
+                                                 plot=plot, save=save)
+    r2_N = plot_DA_correlated_with_duration(transient_plot, x_col_name='ts_entry', y_col_name='height',
+                                                 x_label='Reward Time since Entry (sec)',
+                                                 y_label='Peak Height (dF/F0 in %)',
+                                                 xlim=[0, 8.5], ylim=[0, 6],
+                                                 title=session_label + ' ' + left_or_right + ' DA ~ Entry-Reward interval',
+                                                 left_or_right=left_or_right, save_path=save_path,
+                                                 save_name='DA-NRI',
+                                                 plot=plot, save=save)
+    r2_X = plot_DA_correlated_with_duration(transient_plot, x_col_name='tt_exit', y_col_name='height',
+                                                 x_label='Reward Time to Exit (sec)',
+                                                 y_label='Peak Height (dF/F0 in %)',
+                                                 xlim=[0, 8.5], ylim=[0, 6],
+                                                 title=session_label + ' ' + left_or_right + ' DA ~ Reward-Exit interval',
+                                                 left_or_right=left_or_right, save_path=save_path,
+                                                 save_name='DA-RXI',
+                                                 plot=plot, save=save)
+    # endregion
 
-    fig, ax = plt.subplots()
-    sns.scatterplot(data=transient_plot, x='ts_entry', y='height', hue='block', palette='Set2', marker='x', legend=None)
-    x_2 = transient_plot['ts_entry'].to_numpy().reshape(-1,1)
-    y = transient_plot['height'].to_numpy().reshape(-1,1)
-    huber_n = HuberRegressor(alpha=0.0001, epsilon=1).fit(x_2, y)
-    estimated_y = huber_n.predict(x_2)
-    r2_entry = r2_score(y, estimated_y)
-    plt.plot(x_2, estimated_y)
-    plt.xlabel('Time since Entry (sec)')
-    plt.ylabel('Peak Height')
-    plt.xlim([0, 7])
-    plt.ylim([0.008, 0.06])
-    ax.set_facecolor("white")
-    ax.spines['left'].set_color('dimgrey')
-    ax.spines['bottom'].set_color('dimgrey')
-    plt.grid(False)
-    plt.show()
-    return r2_reward
-    # fig, ax = plt.subplots()
-    # sns.scatterplot(data=transient_plot, x='ts_entry_or_reward', y='height', hue='block', palette='Set2', style='is_1st_reward', legend=None)
-    # plt.xlabel('Time since Entry/Reward (sec)')
-    # plt.ylabel('Peak Height')
-    # plt.xlim([0, 10])
-    # plt.ylim([0.008, 0.1])
-    # ax.set_facecolor("white")
-    # ax.spines['left'].set_color('dimgrey')
-    # ax.spines['bottom'].set_color('dimgrey')
-    # plt.grid(False)
-    # # plt.legend(bbox_to_anchor=(1.01, 1.01), loc='lower left')
-    # plt.show()
-    #
+    # region exclude 1st reward
+    df_reward_exc1 = transient_plot[~transient_plot.is_1st_reward]
+    r2_exc1_R = plot_DA_correlated_with_duration(df_reward_exc1, x_col_name='ts_reward', y_col_name='height',
+                                                 x_label='Reward Time since Last Reward (sec)',
+                                                 y_label='Peak Height (dF/F0 in %)',
+                                                 xlim=[0, 8.5], ylim=[0, 6],
+                                                 title=session_label + ' ' + left_or_right + ' DA ~ IRI (exc 1st reward)',
+                                                 left_or_right=left_or_right, save_path=save_path,
+                                                 save_name='DA-IRI_exc1',
+                                                 plot=plot, save=save)
+    r2_exc1_N = plot_DA_correlated_with_duration(df_reward_exc1, x_col_name='ts_entry', y_col_name='height',
+                                                 x_label='Reward Time since Entry (sec)',
+                                                 y_label='Peak Height (dF/F0 in %)',
+                                                 xlim=[0, 8.5], ylim=[0, 6],
+                                                 title=session_label + ' ' + left_or_right + ' DA ~ Entry-Reward interval (exc 1st reward)',
+                                                 left_or_right=left_or_right, save_path=save_path,
+                                                 save_name='DA-NRI_exc1',
+                                                 plot=plot, save=save)
+    r2_exc1_X = plot_DA_correlated_with_duration(df_reward_exc1, x_col_name='tt_exit', y_col_name='height',
+                                                 x_label='Reward Time to Exit (sec)',
+                                                 y_label='Peak Height (dF/F0 in %)',
+                                                 xlim=[0, 8.5], ylim=[0, 6],
+                                                 title=session_label + ' ' + left_or_right + ' DA ~ Reward-Exit interval (exc 1st reward)',
+                                                 left_or_right=left_or_right, save_path=save_path,
+                                                 save_name='DA-RXI_exc1',
+                                                 plot=plot, save=save)
+    # endregion
+
+    # region Only looking at first reward of each trial
+    df_reward_1st = transient_plot[transient_plot.is_1st_reward]
+    r2_1streward_R = plot_DA_correlated_with_duration(df_reward_1st, x_col_name='ts_reward', y_col_name='height',
+                                                      x_label='Reward Time since Last Reward (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ IRI (1st reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-IRI_1streward',
+                                                      plot=plot, save=save)
+    r2_1streward_N = plot_DA_correlated_with_duration(df_reward_1st, x_col_name='ts_entry', y_col_name='height',
+                                                      x_label='Reward Time since Entry (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ Entry-Reward interval (1st reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-NRI_1streward',
+                                                      plot=plot, save=save)
+    r2_1streward_X = plot_DA_correlated_with_duration(df_reward_1st, x_col_name='tt_exit', y_col_name='height',
+                                                      x_label='Reward Time to Exit (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ Reward-Exit interval (1st reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-RXI_1streward',
+                                                      plot=plot, save=save)
+    # endregion
+
+    # region Only looking at the end reward of each trial
+    df_reward_end = transient_plot[transient_plot.is_end_reward]
+    r2_endreward_R = plot_DA_correlated_with_duration(df_reward_end, x_col_name='ts_reward', y_col_name='height',
+                                                      x_label='Reward Time since Last Reward (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ IRI (end reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-IRI_endreward',
+                                                      plot=plot, save=save)
+    r2_endreward_N = plot_DA_correlated_with_duration(df_reward_end, x_col_name='ts_entry', y_col_name='height',
+                                                      x_label='Reward Time since Entry (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ Entry-Reward interval (end reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-NRI_endreward',
+                                                      plot=plot, save=save)
+    r2_endreward_X = plot_DA_correlated_with_duration(df_reward_end, x_col_name='tt_exit', y_col_name='height',
+                                                      x_label='Reward Time to Exit (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ Reward-Exit interval (end reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-RXI_endreward',
+                                                      plot=plot, save=save)
+    # endregion
+
+    # region middle rewards
+    df_reward_middle = transient_plot[(~transient_plot.is_1st_reward) & (~transient_plot.is_end_reward)]
+    r2_midreward_R = plot_DA_correlated_with_duration(df_reward_middle, x_col_name='ts_reward', y_col_name='height',
+                                                      x_label='Reward Time since Last Reward (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ IRI (mid reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-IRI_midreward',
+                                                      plot=plot, save=save)
+    r2_midreward_N = plot_DA_correlated_with_duration(df_reward_middle, x_col_name='ts_entry', y_col_name='height',
+                                                      x_label='Reward Time since Entry (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ Entry-Reward interval (mid reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-NRI_midreward',
+                                                      plot=plot, save=save)
+    r2_midreward_X = plot_DA_correlated_with_duration(df_reward_middle, x_col_name='tt_exit', y_col_name='height',
+                                                      x_label='Reward Time to Exit (sec)',
+                                                      y_label='Peak Height (dF/F0 in %)',
+                                                      xlim=[0, 8.5], ylim=[0, 6],
+                                                      title=session_label + ' ' + left_or_right + ' DA ~ Reward-Exit interval (mid reward)',
+                                                      left_or_right=left_or_right, save_path=save_path,
+                                                      save_name='DA-RXI_midreward',
+                                                      plot=plot, save=save)
+    # endregion
+
+    return r2_midreward_R, r2_midreward_N, r2_midreward_X, \
+        r2_1streward_R, r2_1streward_N, r2_1streward_X, \
+        r2_endreward_R, r2_endreward_N, r2_endreward_X, \
+        r2_exc1_R, r2_exc1_N, r2_exc1_X, \
+        r2_R, r2_N, r2_X
+
     # # region 3D visualization between time since entry, time since last reward, and da response
     # fig, ax=plt.subplots()
     # sns.scatterplot(data=transient_plot, x='ts_reward', y='ts_entry', hue='height', style='is_1st_reward')
@@ -114,7 +224,6 @@ def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0):
     # plt.grid(False)
     # plt.show()
     # endregion
-
 
     # region plot average traces split by time since last reward
     # reward_preceded_transient = transient[~transient['r2p'].isna()].sort_values('ts_reward', ignore_index=True)
@@ -159,6 +268,3 @@ def visualize_trial_by_trial(transient, dFF0, col_name_in_dFF0):
     # plt.ylim([-0.01, 0.04])
     # plt.show()
     # endregion
-
-
-

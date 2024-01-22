@@ -39,20 +39,30 @@ def find_closest_values(s, x):
     return idx
 
 
-def get_rewardtime_related_to_event(pi_events, transient_df, created_col, condition):
-    transient_df[created_col] = ''
+def get_rewardtime_related_to_event(pi_events, transient_df, created_col, condition, before_or_after):
+    transient_df[created_col] = np.nan
     for i in range(len(transient_df.index)):
         if len(transient_df.prior_reward[i]) > 0:
             time_prior_reward = transient_df.prior_reward[i][0]
-            time_last_event = pi_events.time_recording[(pi_events.time_recording < time_prior_reward) & condition].max()
-            transient_df.at[i, created_col] = time_prior_reward - time_last_event
+            if before_or_after == 'before':
+                time_last_event = pi_events.time_recording[
+                    (pi_events.time_recording < time_prior_reward) & condition].max()
+                transient_df.at[i, created_col] = time_prior_reward - time_last_event
+            if before_or_after == 'after':
+                time_first_event = pi_events.time_recording[
+                    (pi_events.time_recording > time_prior_reward) & condition].min()
+                transient_df.at[i, created_col] = time_first_event - time_prior_reward
+
 
 def get_reward_info(pi_events, transient_df):
-    transient_df['reward_time'] = ''
-    transient_df['reward_order'] = ''
+    transient_df['reward_time'] = np.nan
+    transient_df['reward_order'] = np.nan
+    transient_df['num_reward_in_halfsec_after'] = np.nan
+    transient_df['num_reward_in_halfsec_before'] = np.nan
     transient_df['is_1st_reward'] = np.zeros(len(transient_df.index))
     transient_df['is_1st_reward'] = transient_df['is_1st_reward'].astype(bool)
-    transient_df['closest_idx_in_dFF0'] = ''
+    transient_df['closest_idx_in_dFF0'] = np.nan
+    transient_df['is_from_valid_trial'] = True
     for i in range(len(transient_df.index)):
         if len(transient_df.prior_reward[i]) > 0:
             time_prior_reward = transient_df.prior_reward[i][0]
@@ -62,6 +72,21 @@ def get_reward_info(pi_events, transient_df):
             transient_df.at[i, 'reward_order'] = pi_events.reward_order_in_trial[idx]
             if pi_events.reward_order_in_trial[idx] == 1:
                 transient_df.at[i, 'is_1st_reward'] = True
+            if pi_events.is_valid_trial[idx] == False:
+                transient_df.at[i, 'is_from_valid_trial'] = False
+            events_halfsec_after = pi_events[
+                (pi_events.time_recording <= time_prior_reward + 0.5) & (pi_events.time_recording > time_prior_reward)]
+            events_halfsec_before = pi_events[
+                (pi_events.time_recording <= time_prior_reward) & (pi_events.time_recording > time_prior_reward - 0.5)]
+            transient_df.at[i, 'num_reward_in_halfsec_after'] = len(
+                events_halfsec_after[(events_halfsec_after.key == 'reward') & (events_halfsec_after.value == 1)])
+            transient_df.at[i, 'num_reward_in_halfsec_before'] = len(
+                events_halfsec_before[(events_halfsec_before.key == 'reward') & (events_halfsec_before.value == 1)])
+    transient_df['is_end_reward'] = np.zeros(len(transient_df.index))
+    transient_df['is_end_reward'] = transient_df['is_end_reward'].astype(bool)
+    idx_endreward = transient_df[transient_df.port == 1].groupby('trial')['reward_order'].idxmax().values.astype(int)
+    idx_endreward = idx_endreward[idx_endreward > 0]
+    transient_df['is_end_reward'].iloc[idx_endreward] = True
 
 
 def extract_transient_info(col_name, dFF0, pi_events, plot_zscore=0, plot=0):
@@ -155,20 +180,26 @@ def extract_transient_info(col_name, dFF0, pi_events, plot_zscore=0, plot=0):
     # region Calculate the time relationship between reward and all other behavior events
     get_reward_info(pi_events, transient_df)
     get_rewardtime_related_to_event(pi_events, transient_df, 'ts_reward',
-                                    condition=(pi_events.key == 'reward') & (pi_events.value == 1))
+                                    condition=(pi_events.key == 'reward') & (pi_events.value == 1),
+                                    before_or_after='before')
     get_rewardtime_related_to_event(pi_events, transient_df, 'ts_entry',
-                                    condition=(pi_events.key == 'head') & (pi_events.value == 1))
+                                    condition=(pi_events.key == 'head') & (pi_events.value == 1),
+                                    before_or_after='before')
+    get_rewardtime_related_to_event(pi_events, transient_df, 'tt_exit',
+                                    condition=(pi_events.key == 'head') & (pi_events.value == 0),
+                                    before_or_after='after')
     transient_df['ts_entry_or_reward'] = transient_df['ts_reward']
-    transient_df.loc[transient_df.is_1st_reward, ['ts_entry_or_reward']] = transient_df['ts_entry'].loc[transient_df.is_1st_reward]
+    transient_df.loc[transient_df.is_1st_reward, ['ts_entry_or_reward']] = transient_df['ts_entry'].loc[
+        transient_df.is_1st_reward]
 
     # endregion
     if plot:
         plt.style.use('ggplot')
-        plt.plot(dFF0['time_recording'], dFF0[col_name])
-        plt.plot(transient_df['peak_time'], transient_df['height'], '*', label='peak')
-        plt.plot(dFF0.time_recording[prominences[1]], dFF0[col_name].iloc[prominences[1]], 'x',
+        plt.plot(dFF0['time_recording'], dFF0[col_name]*100)
+        plt.plot(transient_df['peak_time'], transient_df['height']*100, '*', label='peak')
+        plt.plot(dFF0.time_recording[prominences[1]], dFF0[col_name].iloc[prominences[1]]*100, 'x',
                  label='start of transient')
-        plt.plot(dFF0.time_recording[prominences[2]], dFF0[col_name].iloc[prominences[2]], 'x',
+        plt.plot(dFF0.time_recording[prominences[2]], dFF0[col_name].iloc[prominences[2]]*100, 'x',
                  label='end of transient')
         reward_time_exp = pi_events.time_recording[
             (pi_events.key == 'reward') & (pi_events.value == 1) & (pi_events.port == 1)]
@@ -176,17 +207,17 @@ def extract_transient_info(col_name, dFF0, pi_events, plot_zscore=0, plot=0):
             (pi_events.key == 'reward') & (pi_events.value == 1) & (pi_events.port == 2)]
         lick_time = pi_events.time_recording[
             (pi_events.key == 'lick') & (pi_events.value == 1)]
-        plt.scatter(reward_time_exp, [-0.05] * len(reward_time_exp), label="exp reward")
-        plt.scatter(reward_time_bg, [-0.05] * len(reward_time_bg), label="bg reward")
-        plt.scatter(lick_time, [-0.055] * len(lick_time), marker='|')
-        plt.vlines(x=pi_events.time_recording[pi_events.is_1st_encounter], ymin=-0.06, ymax=0.12,
+        plt.scatter(reward_time_exp, [-2] * len(reward_time_exp), label="exp reward")
+        plt.scatter(reward_time_bg, [-2] * len(reward_time_bg), label="bg reward")
+        plt.scatter(lick_time, [-2.5] * len(lick_time), marker='|')
+        plt.vlines(x=pi_events.time_recording[pi_events.is_1st_encounter], ymin=-3, ymax=6,
                    colors='grey', linestyles='dashdot', alpha=0.8, label='1st reward encounter')
         threshold = np.percentile(dFF0[col_name], 90)
-        plt.axhline(y=threshold, color='grey', linestyle='dotted', alpha=0.8, label='90th percentile')
+        plt.axhline(y=threshold*100, color='grey', linestyle='dotted', alpha=0.8, label='90th percentile')
         plt.title(col_name)
-        plt.ylim([-0.06, 0.12])
+        plt.ylim([-3, 6])
         plt.xlabel('Time (sec)')
-        plt.ylabel('dF/F0')
+        plt.ylabel('dF/F0 (%)')
         plt.show()
 
     return transient_df

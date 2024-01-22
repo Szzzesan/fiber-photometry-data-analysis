@@ -28,10 +28,10 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
     func.check_framedrop(neural_events)
     raw_separated = func.de_interleave(neural_events, session_label=signal_dir[-23:-7], plot=0, save=0,
                                        save_path=fig_export_dir)
-    dFF0 = func.calculate_dFF0(raw_separated, session_label=signal_dir[-23:-7], plot=1,
-                               plot_middle_steps=1, save=1, save_path=fig_export_dir)
+    dFF0 = func.calculate_dFF0(raw_separated, session_label=signal_dir[-23:-7], plot=0,
+                               plot_middle_steps=0, save=0, save_path=fig_export_dir)
     dFF0.name = 'dFF0'
-    func.export_df_to_csv(dFF0, fp_export_dir)
+    # func.export_df_to_csv(dFF0, fp_export_dir)
     # endregion
 
     # region Process behavior data and export them
@@ -43,7 +43,7 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
     # region Extract behavior events without trial structures
     non_trial_events = func.extract_behavior_events(pi_events)
     non_trial_events.name = "nontrial_event_sec"
-    func.export_df_to_csv(non_trial_events, event_export_dir)
+    # func.export_df_to_csv(non_trial_events, event_export_dir)
     # endregion
 
     # # region Extract behavior events in regard to trial structures
@@ -54,20 +54,20 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
 
     # region I. plot the heatmap with the histogram
     # region plot the heatmaps but divided by leave time
-    # condition = (pi_events['port'] == 1) & (pi_events['key'] == 'reward') & (pi_events['value'] == 1) & (
-    #             pi_events['reward_order_in_trial'] == 1)
-    # for b in {'left', 'right'}:
-    #     big_interval_for_reward1 = func.get_filter_intervals(
-    #         structured_events[structured_events.exp_leave_time < structured_events.exp_leave_time.quantile(0.5)],
-    #         'exp_entry', 'exp_exit')
-    #     pi_df = pi_events
-    #     pi_trial_df = pi_trials[pi_trials.leave_time < pi_trials.leave_time.quantile(0.5)].reset_index(drop=True)
-    #
-    #     func.sensor_raster_plot(dFF0, pi_df, pi_trial_df, condition,
-    #                             branch=b,
-    #                             port='exp', aligned_by='rewards', sequence=0, plot_markers=1,
-    #                             filter_intervals=big_interval_for_reward1,
-    #                             plot_interval=[-2, 10], save=0, save_path=fig_export_dir)
+    condition = (pi_events['port'] == 1) & (pi_events['key'] == 'reward') & (pi_events['value'] == 1) & (
+                pi_events['reward_order_in_trial'] == 1)
+    for b in {'left', 'right'}:
+        big_interval_for_reward1 = func.get_filter_intervals(
+            structured_events[structured_events.exp_leave_time < structured_events.exp_leave_time.quantile(0.5)],
+            'exp_entry', 'exp_exit')
+        pi_df = pi_events
+        pi_trial_df = pi_trials[pi_trials.leave_time < pi_trials.leave_time.quantile(0.5)].reset_index(drop=True)
+
+        func.sensor_raster_plot(dFF0, pi_df, pi_trial_df, condition,
+                                branch=b,
+                                port='exp', aligned_by='rewards', sequence=0, plot_markers=1,
+                                filter_intervals=big_interval_for_reward1,
+                                plot_interval=[-2, 10], save=0, save_path=fig_export_dir)
     # endregion
 
     # # region plot the reward-to-reward heatmaps
@@ -124,14 +124,17 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
     # region II. trial-by-trial analysis
     transient_right = func.extract_transient_info('green_right', dFF0, pi_events, plot_zscore=0, plot=0)
     transient_left = func.extract_transient_info('green_left', dFF0, pi_events, plot_zscore=0, plot=0)
-    # r_right = func.visualize_trial_by_trial(transient_right, dFF0, 'green_right')
-    # r_left = func.visualize_trial_by_trial(transient_left, dFF0, 'green_left')
+    r_right = func.visualize_trial_by_trial(transient_right, dFF0, 'green_right', session_label=signal_dir[-23:-7],
+                                            plot=1, save=1, save_path=fig_export_dir, left_or_right='right')
+    r_left = func.visualize_trial_by_trial(transient_left, dFF0, 'green_left', session_label=signal_dir[-23:-7],
+                                           plot=1, save=1, save_path=fig_export_dir, left_or_right='left')
 
     # endregion
     print("Finish analyzing" + " session " + signal_filename[-23:-4])
+    print("----------------------------------")
     median_transient_rt = transient_right['height'].median()
     median_transient_lft = transient_left['height'].median()
-    return [median_transient_rt, median_transient_lft]
+    return r_right, r_left, median_transient_rt, median_transient_lft
 
 
 if __name__ == '__main__':
@@ -143,26 +146,111 @@ if __name__ == '__main__':
     behav_file_list = func.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
     TTL_file_list = func.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
     num_session = len(TTL_file_list)
-    median_peakheight_list_rt = np.empty(num_session)
-    median_peakheight_list_lft = np.empty(num_session)
-    for session in range(0, num_session):
+    df_across_session_right = pd.DataFrame(index=np.arange(num_session), columns=['median_peak',
+                                                                                  'r2_IRI_mid',
+                                                                                  'r2_NRI_mid',
+                                                                                  'r2_RXI_mid',
+                                                                                  'r2_IRI_1st',
+                                                                                  'r2_NRI_1st',
+                                                                                  'r2_RXI_1st',
+                                                                                  'r2_IRI_end',
+                                                                                  'r2_NRI_end',
+                                                                                  'r2_RXI_end',
+                                                                                  'r2_IRI_exc1',
+                                                                                  'r2_NRI_exc1',
+                                                                                  'r2_RXI_exc1',
+                                                                                  'r2_R', 'r2_N', 'r2_X'])
+    df_across_session_left = pd.DataFrame(index=np.arange(num_session), columns=['median_peak',
+                                                                                 'r2_IRI_mid',
+                                                                                 'r2_NRI_mid',
+                                                                                 'r2_RXI_mid',
+                                                                                 'r2_IRI_1st',
+                                                                                 'r2_NRI_1st',
+                                                                                 'r2_RXI_1st',
+                                                                                 'r2_IRI_end',
+                                                                                 'r2_NRI_end',
+                                                                                 'r2_RXI_end',
+                                                                                 'r2_IRI_exc1',
+                                                                                 'r2_NRI_exc1',
+                                                                                 'r2_RXI_exc1',
+                                                                                 'r2_R', 'r2_N', 'r2_X'])
+
+    for session in range(9, 10):
+        # try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            [median_peakheight_rt, median_peakheight_lft] = single_session_analysis(animal_dir, FP_file_list[session],
-                                                                                    TTL_file_list[session],
-                                                                                    behav_file_list[session])
-            median_peakheight_list_rt[session] = median_peakheight_rt
-            median_peakheight_list_lft[session] = median_peakheight_lft
+            r_right, r_left, median_ph_rt, median_ph_lft = single_session_analysis(animal_dir,
+                                                                                   FP_file_list[session],
+                                                                                   TTL_file_list[session],
+                                                                                   behav_file_list[session])
+            df_across_session_right.iloc[session, 0] = median_ph_rt
+            df_across_session_right.iloc[session, 1:] = r_right
+            df_across_session_left.iloc[session, 0] = median_ph_lft
+            df_across_session_left.iloc[session, 1:] = r_left
+
+        # except:
+        #     print("skipped session " + FP_file_list[session][-23:-7] + "!!!")
+        #     print("----------------------------------")
+        #     continue
+
+    df_across_session_right = df_across_session_right.astype(float)
+    df_across_session_left = df_across_session_left.astype(float)
 
     across_session_save_path = os.path.join(animal_dir, 'figures')
-    fig_name = os.path.join(across_session_save_path, 'signal_strength' + '.png')
-    plt.style.use('ggplot')
-    plt.plot(median_peakheight_list_rt * 100, label='right')
-    plt.plot(median_peakheight_list_lft * 100, label='left')
-    plt.xlabel('Session')
-    plt.ylabel('Median dF/F0 (%)')
-    plt.title('Signal strength across session')
+    fig_name_r = os.path.join(across_session_save_path, 'r2_comparison_right' + '.png')
+    fig_name_l = os.path.join(across_session_save_path, 'r2_comparison_left' + '.png')
+    fig, ax = plt.subplots()
+    df_across_session_right.boxplot(column=['r2_IRI_exc1',
+                                            'r2_NRI_exc1',
+                                            'r2_RXI_exc1',
+                                            'r2_R', 'r2_N', 'r2_X', 'r2_RXI_end'],
+                                    grid=False, rot=15)
+    ax.set_ylabel('$R^{2}$')
+    ax.set_xlabel('Type of Interval')
+    plt.ylim([-0.02, 0.53])
+    plt.title(animal_str + ' ' + 'Right ' + '$R^{2}$' + ' Comparison')
+    ax.set_facecolor("white")
+    ax.spines['left'].set_color('dimgrey')
+    ax.spines['bottom'].set_color('dimgrey')
+    fig.show()
+    fig.savefig(fig_name_r)
+
+    fig, ax = plt.subplots()
+    df_across_session_left.boxplot(column=['r2_IRI_exc1',
+                                           'r2_NRI_exc1',
+                                           'r2_RXI_exc1',
+                                           'r2_R', 'r2_N', 'r2_X', 'r2_RXI_end'],
+                                   grid=False, rot=15)
+    ax.set_ylabel('$R^{2}$')
+    ax.set_xlabel('Type of Interval')
+    plt.ylim([-0.02, 0.53])
+    plt.title(animal_str + ' ' + 'Left ' + '$R^{2}$' + ' Comparison')
+    ax.set_facecolor("white")
+    ax.spines['left'].set_color('dimgrey')
+    ax.spines['bottom'].set_color('dimgrey')
+    fig.show()
+    fig.savefig(fig_name_l)
+
+    fig_name = os.path.join(across_session_save_path, 'r2_IRI_midreward' + '.png')
+    fig, ax = plt.subplots()
+    plt.plot(df_across_session_right.r2_IRI_exc1, label='right')
+    plt.plot(df_across_session_left.r2_IRI_exc1, label='left')
     plt.legend()
-    plt.show()
-    fig = plt.gcf()
+    plt.xlabel('Session')
+    plt.ylabel('$R^{2}$')
+    plt.title('DA-IRI Correlation across session in ' + animal_str)
+    fig.show()
     fig.savefig(fig_name)
+
+    # fig_name = os.path.join(across_session_save_path, 'signal_strength_across_session' + '.png')
+    # fig, ax = plt.subplots()
+    # plt.plot(df_across_session_right['median_peak'] * 100, label='right')
+    # plt.plot(df_across_session_left['median_peak'] * 100, label='left')
+    # plt.ylim([0, 3.5])
+    # plt.xlim([-1, 39])
+    # plt.xlabel('Session')
+    # plt.ylabel('Median dF/F0 (%)')
+    # plt.title('Signal strength across session in ' + animal_str)
+    # plt.legend()
+    # fig.show()
+    # fig.savefig(fig_name)
