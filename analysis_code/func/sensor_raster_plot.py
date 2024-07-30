@@ -138,23 +138,18 @@ def get_marker_each_row(pi_events, marker_event, aligner_event_time, interval):
     return df
 
 
-def get_marker_for_scatters(pi_events, pi_trials, aligner_event, sequence, plot_interval, filter_intervals, bin_width,
+def get_marker_for_scatters(pi_events, condition, plot_interval, filter_intervals, bin_width,
                             sort='False', sort_direction='before'):
-    aligner_event_time_series = np.empty(len(pi_trials.index))
-    for idx in pi_trials.index:
-        if (len(pi_trials[aligner_event].iloc[idx]) > sequence) & (len(pi_trials[aligner_event].iloc[idx]) > 0):
-            aligner_event_time_series[idx] = pi_trials[aligner_event].iloc[idx][sequence]
-        else:
-            aligner_event_time_series[idx] = np.nan
+    aligner_event_time_series = pi_events[['trial', 'time_recording']][condition].reset_index()
     df_for_scatter = pd.DataFrame(columns=['marker_time', 'time', 'trial', 'event'])
     for marker_event in ['entry', 'exit', 'reward', 'lick']:
         for i in range(len(aligner_event_time_series)):
             if ~np.isnan(list(filter_intervals[i, :])).any():
                 inner_interval = find_inner_interval(plot_interval,
-                                                     filter_intervals[i, :] - aligner_event_time_series[i])
+                                                     filter_intervals[i, :] - aligner_event_time_series.time_recording[i])
                 if ~np.isnan(inner_interval).any():
                     inner_interval = [inner_interval[0] - bin_width, inner_interval[1] + bin_width]
-                    df = get_marker_each_row(pi_events, marker_event, aligner_event_time_series[i],
+                    df = get_marker_each_row(pi_events, marker_event, aligner_event_time_series.time_recording[i],
                                              interval=inner_interval)
                 else:
                     df = pd.DataFrame()
@@ -173,7 +168,7 @@ def get_marker_for_scatters(pi_events, pi_trials, aligner_event, sequence, plot_
     return df_for_scatter
 
 
-def sensor_raster_plot(dFF0, pi_events, pi_trials, condition,
+def sensor_raster_plot(dFF0, pi_events, condition,
                        branch='right',
                        port='bg',
                        aligned_by='rewards',
@@ -189,8 +184,7 @@ def sensor_raster_plot(dFF0, pi_events, pi_trials, condition,
                                           plot_interval=plot_interval, filter_intervals=filter_intervals,
                                           bin_size=1 / 30, sort=sort, sort_direction=sort_direction)
     dFF0_mean = dFF0_for_heatmap.mean(axis=0)
-    df_for_scatters = get_marker_for_scatters(pi_events, pi_trials, aligner_event=port + '_' + aligned_by,
-                                              sequence=sequence, plot_interval=plot_interval,
+    df_for_scatters = get_marker_for_scatters(pi_events, condition, plot_interval=plot_interval,
                                               filter_intervals=filter_intervals, bin_width=bin_size, sort=sort,
                                               sort_direction=sort_direction)
     lick_df = df_for_scatters[df_for_scatters.event == 'lick']

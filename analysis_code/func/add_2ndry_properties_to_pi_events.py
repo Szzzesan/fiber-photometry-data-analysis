@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import func
+from .get_interlocked_arrays import get_interlocked_arrays
 
 
 def identify_event_order(pi_events, col_name_to_add, condition):
@@ -23,24 +23,56 @@ def get_valid_entry_exit(pi_events):
     pi_events['is_valid_trial'] = True
     reward_trials = pi_events[(pi_events.key == 'reward_initiate')].trial.to_numpy()
     non_reward = ~pi_events.trial.isin(reward_trials)
-    bg_end_times = pi_events[(pi_events.key == 'LED') & (pi_events.port == 2) & (pi_events.value == 1) & non_reward]
+    bg_end_times = pi_events[(pi_events.key == 'LED') & (pi_events.port == 2) & (pi_events.value == 1)]
+
+    exp_entries = pi_events[(pi_events.key == 'head') & (pi_events.value == 1) & (pi_events.port == 1)]
+    exp_exits = pi_events[(pi_events.key == 'head') & (pi_events.value == 0) & (pi_events.port == 1)]
+    bg_entries = pi_events[(pi_events.key == 'trial') & (pi_events.value == 1) & (pi_events.port == 2)]
+    bg_exits = pi_events[(pi_events.key == 'head') & (pi_events.value == 0) & (pi_events.port == 2)]
+    # todo: give a valid entry and exit to each trial regardless of whether the trial is valid
+    # todo: debug get_interlocked_arrays()
+    vid_bg_entries, vid_exp_exits = get_interlocked_arrays(bg_entries.index.to_numpy(), exp_exits.index.to_numpy(),
+                                                           direction='widest')
+    vid_bg_entries, vid_bg_exits = get_interlocked_arrays(bg_entries.index.to_numpy(), bg_exits.index.to_numpy(),
+                                                          direction='widest')
+
+    # bgx_bgn = np.subtract.outer(bg_exits.index.to_numpy(), vid_bg_entries)
+    # expx_bgx = np.subtract.outer(vid_exp_exits, bg_exits.index.to_numpy())
+    # product_for_bg_exits = np.matmul(bgx_bgn > 0, expx_bgx > 0)
+    # product_rolled = np.roll(product_for_bg_exits, -1)
+    # subtracted = np.subtract(product_for_bg_exits.astype(int), product_rolled.astype(int))
+    # vid_bg_exits = bg_exits.index.to_numpy()[list(  (subtracted.diagonal())[0])]
+
+    expn_bgx = np.subtract.outer(exp_entries.index.to_numpy(), vid_bg_exits)
+    expx_expn = np.subtract.outer(vid_exp_exits, exp_entries.index.to_numpy())
+    product_for_intervals = np.matmul(expx_expn > 0, expn_bgx > 0)
+    intervals_usable = list(np.where(product_for_intervals.diagonal())[0])
+    expn_bgx = expn_bgx[:, intervals_usable]
+    expx_expn = expx_expn[intervals_usable, :]
+    product_for_exp_entries = np.matmul(expn_bgx > 0, expx_expn > 0)
+    vid_exp_entries = exp_entries.index.to_numpy()[list(np.where(product_for_exp_entries.diagonal() == 1)[0])]
+    vid_exp_entries, vid_exp_exits_new = get_interlocked_arrays(vid_exp_entries, vid_exp_exits, direction='widest')
+    # todo: examine why the returned arrays skip some elements
+    vid_bg_exits, vid_exp_entries = get_interlocked_arrays(vid_bg_exits, exp_entries.index.to_numpy(),
+                                                           direction='narrowest')
+    vid_exp_entries, vid_exp_exits = get_interlocked_arrays(vid_exp_entries, vid_exp_exits, direction='widest')
+    vid_bg_entries, vid_exp_exits = get_interlocked_arrays(vid_bg_entries, vid_exp_exits, direction='widest')
+    pi_events['is_valid'] = False
+    pi_events.loc[vid_exp_entries, 'is_valid'] = True
+    pi_events.loc[vid_exp_exits, 'is_valid'] = True
+    pi_events.loc[vid_bg_entries, 'is_valid'] = True
+    pi_events.loc[vid_bg_exits, 'is_valid'] = True
     # region only get the trials where there are both an exp_entry and an exp_exit
-    exp_entries = pi_events[(pi_events.key == 'head') & (pi_events.value == 1) & (pi_events.port == 1) & non_reward]
-    exp_exits = pi_events[(pi_events.key == 'head') & (pi_events.value == 0) & (pi_events.port == 1) & non_reward]
-    bg_entries = pi_events[(pi_events.key == 'trial') & (pi_events.value == 1) & (pi_events.port == 2) & non_reward]
-    bg_exits = pi_events[(pi_events.key == 'head') & (pi_events.value == 0) & (pi_events.port == 2) & non_reward]
     complete_trials = set(exp_entries.trial) & set(exp_exits.trial) & set(bg_entries.trial) & set(bg_exits.trial)
-    # exp_entries = exp_entries[exp_entries.trial.isin(complete_trials)]
-    # exp_exits = exp_exits[exp_exits.trial.isin(complete_trials)]
-    # bg_entries = bg_entries[bg_entries.trial.isin(complete_trials)]
-    # bg_exits = bg_exits[bg_exits.trial.isin(complete_trials)]
     update_trial_validity(complete_trials)
     # endregion
     # region valid condition 1: toss trials with multiple re-entry into the exponential port
-    is_single_entry = exp_entries.groupby('trial').entry_order_in_trial.max() == 1
-    single_entry_trials = is_single_entry[is_single_entry].index
-    update_trial_validity(single_entry_trials)
-    pi_events.is_valid_trial[~pi_events['trial'].isin(single_entry_trials)] = False
+    # but skip this step when it's a single-reward task
+    if (pi_events['task'].iloc[0] != 'single_reward'):
+        is_single_entry = exp_entries.groupby('trial').entry_order_in_trial.max() == 1
+        single_entry_trials = is_single_entry[is_single_entry].index
+        update_trial_validity(single_entry_trials)
+        pi_events.is_valid_trial[~pi_events['trial'].isin(single_entry_trials)] = False
     # endregion
     # region valid condition 2: toss trials with background stay too long
     bg_stay = bg_exits.groupby('trial').trial_time.max()
@@ -50,7 +82,9 @@ def get_valid_entry_exit(pi_events):
     good_bg_stay = good_for_long_block | good_for_short_block
     good_bg_trials = good_bg_stay[good_bg_stay].index
     update_trial_validity(good_bg_trials)
-    pi_events.is_valid_trial[~pi_events['trial'].isin(good_bg_trials)] = False
+    pi_events.loc[~pi_events['trial'].isin(good_bg_trials), 'is_valid_trial'] = False
+    for trial in trial_phase.index.to_list():
+        pi_events.loc[pi_events.trial == trial, 'phase'] = trial_phase.loc[trial]
     # endregion
     valid_trials = np.unique(pi_events.trial[pi_events.is_valid_trial])
     bg_entries_idx = [bg_entries.groupby('trial').groups[i].max() for i in valid_trials]
@@ -62,49 +96,11 @@ def get_valid_entry_exit(pi_events):
     exp_entries = exp_entries.time_recording.to_numpy()
     exp_exits = exp_exits.time_recording.to_numpy()
 
-    pi_events['is_valid'] = False
-    pi_events.is_valid[exp_entries_idx] = True
-    pi_events.is_valid[exp_exits_idx] = True
-    pi_events.is_valid[bg_entries_idx] = True
-    pi_events.is_valid[bg_exits_idx] = True
-    # bg_end_times = bg_end_times[bg_end_times.time_recording < exp_entries.time_recording.max()]
-    # ind, dif = func.min_dif(bg_end_times.time_recording, exp_entries.time_recording, return_index=True)
-    # exp_entries = exp_entries.iloc[np.unique(ind)]
-    # grouped_entries = exp_entries.groupby('trial')
-    # grouped_exits = exp_exits.groupby('trial')
-    # exp_entries = grouped_entries.time_recording.max()
-    # exp_exits = grouped_exits.time_recording.max()
-    # exp_entries_idx = [grouped_entries.groups[i][-1] for i in range(1, len(grouped_entries.groups) + 1)]
-    # exp_exits_idx = [grouped_exits.groups[i][-1] for i in range(1, len(grouped_exits.groups) + 1)]
-    # valid_trials = np.intersect1d(exp_exits.index.values, exp_entries.index.values)
-    # valid_trials = [int(valid_trials[i]) for i in range(len(valid_trials))]
-    # exp_exits = exp_exits.loc[valid_trials]
-    # exp_entries = exp_entries.loc[valid_trials]
-    # exp_entries_idx = [exp_entries_idx[i - 1] for i in valid_trials]
-    # exp_exits_idx = [exp_exits_idx[i - 1] for i in valid_trials]
-    # if len(exp_exits.to_numpy()) != len(exp_entries.to_numpy()):
-    #     print()
-    # exp_entries = exp_entries.reset_index()
-    # exp_exits = exp_exits.reset_index()
-    #
-    # bg_entries = pi_events[(pi_events.key == 'trial') & (pi_events.value == 1) & (pi_events.port == 2) & non_reward]
-    # bg_exits = pi_events[(pi_events.key == 'head') & (pi_events.value == 0) & (pi_events.port == 2) & non_reward]
-    # grouped_bg_entries = bg_entries.groupby('trial')
-    # grouped_bg_exits = bg_exits.groupby('trial')
-    # bg_entries_idx = [grouped_bg_entries.groups[i][0] for i in range(1, len(grouped_bg_entries.groups) + 1)]
-    # bg_exits_idx = [grouped_bg_exits.groups[i][-1] for i in range(1, len(grouped_bg_exits.groups) + 1)]
-    # bg_entries_idx = [bg_entries_idx[i - 1] for i in valid_trials]
-    # bg_exits_idx = [bg_exits_idx[i - 1] for i in valid_trials]
-    # bg_entries = grouped_bg_entries.time_recording.max()
-    # bg_exits = grouped_bg_exits.time_recording.max()
-    # bg_entries = bg_entries.loc[valid_trials]
-    # bg_exits = bg_exits.loc[valid_trials]
-    # bg_entries = bg_entries.reset_index()
-    # bg_exits = bg_exits.reset_index()
     return pi_events, valid_trials, exp_entries, exp_exits, bg_entries, bg_exits
 
 
 def add_2ndry_properties_to_pi_events(pi_events):
+    pd.options.mode.chained_assignment = None  # default='warn'
     pi_events.total_trial = int(pi_events.trial.max())
 
     # region Identify the order of rewards, entries, and exits in each trial
