@@ -6,11 +6,13 @@ import matplotlib.pyplot as plt
 
 def quantify_da(col_name, dFF0, pi_events, plot=False):
     dff0 = dFF0[col_name]
-    zscore = (dff0.to_numpy() - dff0.mean()) / dff0.std()
-    threshold = np.percentile(zscore, 90)
-    peaks, prop = find_peaks(zscore, rel_height=0.25, width=[4, 40], height=threshold, wlen=60, prominence=1)
-    widths = peak_widths(zscore, peaks, rel_height=0.25)
-    prominences = peak_prominences(zscore, peaks, wlen=60)
+    my_zscore = (dff0.to_numpy() - dff0.mean()) / dff0.std()
+    idx_taskbegin = dFF0.index[dFF0['time_recording'] >= pi_events['time_recording'].min()].min()
+    idx_taskend = dFF0.index[dFF0['time_recording'] <= pi_events['time_recording'].max()].max()
+    threshold = np.nanpercentile(my_zscore[idx_taskbegin:idx_taskend+1], 90)
+    peaks, prop = find_peaks(my_zscore, rel_height=0.25, width=[4, 40], height=threshold, wlen=60, prominence=1)
+    widths = peak_widths(my_zscore, peaks, rel_height=0.25)
+    prominences = peak_prominences(my_zscore, peaks, wlen=60)
     for i in range(len(widths[3])):
         widths[2][i] = int(widths[2][i])
         widths[3][i] = int(widths[3][i])
@@ -28,10 +30,10 @@ def quantify_da(col_name, dFF0, pi_events, plot=False):
                                      x=dFF0.time_recording[peak_start:peak_end])
     if plot:
         plt.style.use('ggplot')
-        plt.plot(dFF0["time_recording"], zscore)
-        plt.plot(dFF0.time_recording[peaks], zscore[peaks], '*')
-        plt.plot(dFF0.time_recording[prominences[1]], zscore[prominences[1]], 'x')
-        plt.plot(dFF0.time_recording[prominences[2]], zscore[prominences[2]], 'x')
+        plt.plot(dFF0["time_recording"], my_zscore)
+        plt.plot(dFF0.time_recording[peaks], my_zscore[peaks], '*')
+        plt.plot(dFF0.time_recording[prominences[1]], my_zscore[prominences[1]], 'x')
+        plt.plot(dFF0.time_recording[prominences[2]], my_zscore[prominences[2]], 'x')
         plt.scatter(reward_time_exp, [-3] * len(reward_time_exp), label="exp")
         plt.scatter(reward_time_bg, [-3] * len(reward_time_bg), label="bg")
         plt.scatter(lick_time, [-3.2] * len(lick_time), marker='|')
@@ -45,4 +47,4 @@ def quantify_da(col_name, dFF0, pi_events, plot=False):
         plt.xlabel('Time (sec)')
         plt.ylabel('zscore')
         plt.show()
-    return zscore, peaks, widths, prominences, auc
+    return my_zscore, peaks, widths, prominences, auc

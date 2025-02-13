@@ -4,6 +4,7 @@ from func.export_df_to_txt import export_df_to_txt
 from func.extract_behavior_events import extract_behavior_events
 from func.data_read_sync import data_read_sync
 from func.calculate_dFF0 import calculate_dFF0
+from func.calculate_dFF0_Hamilos import calculate_dFF0_Hamilos
 from func.export_df_to_pkl import export_df_to_pkl
 from func.extract_trial import extract_trial
 from func.get_event_by_trial import get_reward_by_trial
@@ -22,3 +23,17 @@ from func.quantify_da import quantify_da
 from func.extract_transient_info import extract_transient_info
 from func.add_2ndry_properties_to_pi_events import add_2ndry_properties_to_pi_events
 from func.visualize_trial_by_trial import visualize_trial_by_trial
+from func.slow_timescale_analysis import slow_timescale_analysis
+from func.find_closest_value import find_closest_value
+from func.trial_average import trial_average
+from func.plot_average import plot_average
+from func.get_trial_events import get_trial_events
+from .get_bools import get_bools, read_datetime, write_datetime
+from .make_intervals_df import make_intervals_df, get_trial_group
+from .visualize_adjusted_optimal import visualize_adjusted_optimal
+from .plot_heatmap import *
+from .get_interlocked_arrays import get_interlocked_arrays
+from .construct_matrix_for_average_traces import construct_matrix_for_average_traces
+from .extract_intervals import *
+from .add_subplot_axes import add_subplot_axes
+from .process_block_transition import process_block_transition

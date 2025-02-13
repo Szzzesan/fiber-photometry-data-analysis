@@ -89,7 +89,6 @@ def get_signal_per_bin(signal_data, branch, aligner_event_time, plot_interval, f
         binned_dFF0 = pd.DataFrame({'time': time_label, 'dFF0': grouped.dFF0.values})
         indices_in_range = np.where(
             (binned_dFF0.time.to_numpy() <= inner_interval[1]) & (binned_dFF0.time.to_numpy() >= inner_interval[0]))
-        # todo: There must be sth. wrong with the length of filter_intervals. Fix it
         binned_dFF0.drop(range(indices_in_range[0][0] + 1), inplace=True)
         binned_dFF0.drop(range(indices_in_range[0][-1] + 1, max(binned_dFF0.index) + 1), inplace=True)
     else:
@@ -138,23 +137,18 @@ def get_marker_each_row(pi_events, marker_event, aligner_event_time, interval):
     return df
 
 
-def get_marker_for_scatters(pi_events, pi_trials, aligner_event, sequence, plot_interval, filter_intervals, bin_width,
+def get_marker_for_scatters(pi_events, condition, plot_interval, filter_intervals, bin_width,
                             sort='False', sort_direction='before'):
-    aligner_event_time_series = np.empty(len(pi_trials.index))
-    for idx in pi_trials.index:
-        if (len(pi_trials[aligner_event].iloc[idx]) > sequence) & (len(pi_trials[aligner_event].iloc[idx]) > 0):
-            aligner_event_time_series[idx] = pi_trials[aligner_event].iloc[idx][sequence]
-        else:
-            aligner_event_time_series[idx] = np.nan
+    aligner_event_time_series = pi_events[['trial', 'time_recording']][condition].reset_index()
     df_for_scatter = pd.DataFrame(columns=['marker_time', 'time', 'trial', 'event'])
     for marker_event in ['entry', 'exit', 'reward', 'lick']:
         for i in range(len(aligner_event_time_series)):
             if ~np.isnan(list(filter_intervals[i, :])).any():
                 inner_interval = find_inner_interval(plot_interval,
-                                                     filter_intervals[i, :] - aligner_event_time_series[i])
+                                                     filter_intervals[i, :] - aligner_event_time_series.time_recording[i])
                 if ~np.isnan(inner_interval).any():
                     inner_interval = [inner_interval[0] - bin_width, inner_interval[1] + bin_width]
-                    df = get_marker_each_row(pi_events, marker_event, aligner_event_time_series[i],
+                    df = get_marker_each_row(pi_events, marker_event, aligner_event_time_series.time_recording[i],
                                              interval=inner_interval)
                 else:
                     df = pd.DataFrame()
@@ -173,7 +167,7 @@ def get_marker_for_scatters(pi_events, pi_trials, aligner_event, sequence, plot_
     return df_for_scatter
 
 
-def sensor_raster_plot(dFF0, pi_events, pi_trials, condition,
+def sensor_raster_plot(dFF0, pi_events, condition,
                        branch='right',
                        port='bg',
                        aligned_by='rewards',
@@ -189,8 +183,7 @@ def sensor_raster_plot(dFF0, pi_events, pi_trials, condition,
                                           plot_interval=plot_interval, filter_intervals=filter_intervals,
                                           bin_size=1 / 30, sort=sort, sort_direction=sort_direction)
     dFF0_mean = dFF0_for_heatmap.mean(axis=0)
-    df_for_scatters = get_marker_for_scatters(pi_events, pi_trials, aligner_event=port + '_' + aligned_by,
-                                              sequence=sequence, plot_interval=plot_interval,
+    df_for_scatters = get_marker_for_scatters(pi_events, condition, plot_interval=plot_interval,
                                               filter_intervals=filter_intervals, bin_width=bin_size, sort=sort,
                                               sort_direction=sort_direction)
     lick_df = df_for_scatters[df_for_scatters.event == 'lick']
@@ -209,8 +202,8 @@ def sensor_raster_plot(dFF0, pi_events, pi_trials, condition,
     fig = plt.figure(figsize=fig_size)
     gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
     ax0 = plt.subplot(gs[0])
-    ax0 = sns.heatmap(dFF0_for_heatmap, cmap=colormap, vmin=-0.03, vmax=0.09,
-                      cbar_kws={'ticks': [-0.03, 0, 0.03, 0.06, 0.09]})
+    ax0 = sns.heatmap(dFF0_for_heatmap, cmap=colormap, vmin=-0.01, vmax=0.05,
+                      cbar_kws={'ticks': [-0.01, 0.01, 0.03, 0.05]})
     if plot_markers:
         sns.scatterplot(x=(df_for_scatters.time - plot_interval[0]) / bin_size,
                         y=df_for_scatters.y_position + 0.5, hue=df_for_scatters.event, style=df_for_scatters.event,
@@ -227,12 +220,12 @@ def sensor_raster_plot(dFF0, pi_events, pi_trials, condition,
     ax1.set_position([l, b, 0.8 * w, h])
     ax1.set_ylabel('lick histogram')
     ax2 = ax1.twinx()
-    plt.plot(dFF0_mean, zorder=1)
+    plt.plot(dFF0_mean * 100, zorder=1)
     ax2.set_position([l, b, 0.8 * w, h])
     plt.xlim([min(dFF0_mean.index), max(dFF0_mean.index)])
-    plt.ylim([-0.03, 0.06])
+    plt.ylim([-0.5, 2.5])
     plt.xlabel('Time (sec)')
-    plt.ylabel('dF/F0')
+    plt.ylabel('dF/F0 (%)')
     plt.suptitle(branch + ' branch aligned by ' + port + ' ' + aligned_by + '#' + str(sequence + 1), x=0.43, y=0.93,
                  fontsize=20, weight=10)
     plt.show()

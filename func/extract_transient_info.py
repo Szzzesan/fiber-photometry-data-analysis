@@ -6,21 +6,24 @@ import matplotlib.pyplot as plt
 
 
 def add_event_as_column(transient_df, col_name_in_transient_df, pi_events, condition, search_range):
-    transient_df[col_name_in_transient_df] = ''
+    transient_df[col_name_in_transient_df] = np.nan
     for i in range(len(transient_df.index)):
         pt = transient_df.peak_time[i]
         search_start = pt + search_range[0]
         search_end = pt + search_range[1]
         is_in_search_range = (pi_events.time_recording > search_start) & (pi_events.time_recording < search_end)
         events_within_range = pi_events.time_recording[is_in_search_range & condition].to_numpy()
-        transient_df[col_name_in_transient_df].iloc[i] = events_within_range
-
+        if events_within_range.size > 0:
+            transient_df.loc[i, col_name_in_transient_df] = events_within_range[0]
 
 def calculate_occurrence_given_transient(col_in_transient_df):
     event_occur = np.zeros(len(col_in_transient_df))
     for i in range(len(event_occur)):
-        event_occur[i] = len(col_in_transient_df[i])
-    occur_given_transient = np.count_nonzero(event_occur) / len(event_occur)
+        event_occur[i] = col_in_transient_df[i].size
+    if len(event_occur) == 0:
+        occur_given_transient = np.nan
+    else:
+        occur_given_transient = np.count_nonzero(event_occur) / len(event_occur)
     return occur_given_transient
 
 
@@ -28,13 +31,21 @@ def get_event2peak_interval(transient, col_name, direction=1):
     event_in_range = np.empty(len(transient.index))
     event_in_range[:] = np.nan
     for i in range(len(event_in_range)):
-        if len(transient[col_name].iloc[i]) > 0:
+        if transient.loc[i, col_name].size == 1:
+            event_in_range[i] = transient.loc[i, col_name]
+        if transient.loc[i, col_name].size > 1:
             event_in_range[i] = transient[col_name][i][0]
     event2peak_interval = (transient.peak_time - event_in_range) * direction
     return event2peak_interval
 
 
 def find_closest_values(s, x):
+    if not isinstance(s, np.ndarray):
+        raise ValueError(f"Expected 's' to be a NumPy array, but got {type(s).__name__} instead.")
+    if len(s) == 0:
+        raise ValueError("Input array 's' is empty.")
+    if np.isnan(s).any():
+        raise ValueError("Input array 's' contains NaN values.")
     idx = (np.abs(s - x)).argmin()
     return idx
 
@@ -42,8 +53,11 @@ def find_closest_values(s, x):
 def get_rewardtime_related_to_event(pi_events, transient_df, created_col, condition, before_or_after):
     transient_df[created_col] = np.nan
     for i in range(len(transient_df.index)):
-        if len(transient_df.prior_reward[i]) > 0:
-            time_prior_reward = transient_df.prior_reward[i][0]
+        if transient_df.prior_reward[i].size > 0:
+            if transient_df.prior_reward[i].size == 1:
+                time_prior_reward = transient_df.prior_reward[i]
+            else:
+                time_prior_reward = transient_df.prior_reward[i][0]
             if before_or_after == 'before':
                 time_last_event = pi_events.time_recording[
                     (pi_events.time_recording < time_prior_reward) & condition].max()
@@ -64,10 +78,13 @@ def get_reward_info(pi_events, transient_df):
     transient_df['closest_idx_in_dFF0'] = np.nan
     transient_df['is_from_valid_trial'] = True
     for i in range(len(transient_df.index)):
-        if len(transient_df.prior_reward[i]) > 0:
-            time_prior_reward = transient_df.prior_reward[i][0]
+        if transient_df.prior_reward[i].size > 0:
+            if transient_df.prior_reward[i].size == 1:
+                time_prior_reward = transient_df.prior_reward[i]
+            else:
+                time_prior_reward = transient_df.prior_reward[i][0]
             transient_df.at[i, 'reward_time'] = time_prior_reward
-            idx = find_closest_values(pi_events.time_recording, time_prior_reward)
+            idx = find_closest_values(pi_events.time_recording.to_numpy(), time_prior_reward)
             transient_df.at[i, 'closest_idx_in_dFF0'] = idx
             transient_df.at[i, 'reward_order'] = pi_events.reward_order_in_trial[idx]
             if pi_events.reward_order_in_trial[idx] == 1:
@@ -86,7 +103,7 @@ def get_reward_info(pi_events, transient_df):
     transient_df['is_end_reward'] = transient_df['is_end_reward'].astype(bool)
     idx_endreward = transient_df[transient_df.port == 1].groupby('trial')['reward_order'].idxmax().values.astype(int)
     idx_endreward = idx_endreward[idx_endreward > 0]
-    transient_df['is_end_reward'].iloc[idx_endreward] = True
+    transient_df.loc[idx_endreward, 'is_end_reward'] = True
 
 
 def extract_transient_info(col_name, dFF0, pi_events, plot_zscore=0, plot=0):
@@ -100,7 +117,7 @@ def extract_transient_info(col_name, dFF0, pi_events, plot_zscore=0, plot=0):
     # region The properties of the transients themselves
     transient_df['peak_idx'] = peaks
     transient_df['peak_time'] = peaktime
-    transient_df['height'] = dFF0[col_name].iloc[peaks].to_numpy()
+    transient_df['height'] = dFF0.loc[peaks, col_name].to_numpy()
     transient_df['transient_start'] = dFF0.time_recording[prominences[1]].to_numpy()
     transient_df['transient_end'] = dFF0.time_recording[prominences[2]].to_numpy()
     transient_df['width'] = transient_df['transient_end'] - transient_df['transient_start']
@@ -156,23 +173,23 @@ def extract_transient_info(col_name, dFF0, pi_events, plot_zscore=0, plot=0):
     transient_df['p2n'] = get_event2peak_interval(transient_df, 'post_entry', direction=1)
     transient_df['x2p'] = get_event2peak_interval(transient_df, 'prior_exit', direction=1)
     transient_df['p2x'] = get_event2peak_interval(transient_df, 'post_exit', direction=1)
-    transient_df.var_r2p = stats.variance(transient_df.r2p[~transient_df['r2p'].isna()])
-    transient_df.var_p2r = stats.variance(transient_df.p2r[~transient_df['p2r'].isna()])
-    transient_df.var_r2p2r = stats.variance(transient_df.r2p2r[~transient_df['r2p2r'].isna()])
-    transient_df.var_e2p = stats.variance(transient_df.e2p[~transient_df['e2p'].isna()])
-    transient_df.var_l2p = stats.variance(transient_df.l2p[~transient_df['l2p'].isna()])
-    transient_df.var_p2l = stats.variance(transient_df.p2l[~transient_df['p2l'].isna()])
-    transient_df.var_n2p = stats.variance(transient_df.n2p[~transient_df['n2p'].isna()])
-    transient_df.var_p2n = stats.variance(transient_df.p2n[~transient_df['p2n'].isna()])
-    transient_df.var_x2p = stats.variance(transient_df.x2p[~transient_df['x2p'].isna()])
-    transient_df.var_p2x = stats.variance(transient_df.p2x[~transient_df['p2x'].isna()])
+    # transient_df.var_r2p = stats.variance(transient_df.r2p[~transient_df['r2p'].isna()])
+    # transient_df.var_p2r = stats.variance(transient_df.p2r[~transient_df['p2r'].isna()])
+    # transient_df.var_r2p2r = stats.variance(transient_df.r2p2r[~transient_df['r2p2r'].isna()])
+    # transient_df.var_e2p = stats.variance(transient_df.e2p[~transient_df['e2p'].isna()])
+    # transient_df.var_l2p = stats.variance(transient_df.l2p[~transient_df['l2p'].isna()])
+    # transient_df.var_p2l = stats.variance(transient_df.p2l[~transient_df['p2l'].isna()])
+    # transient_df.var_n2p = stats.variance(transient_df.n2p[~transient_df['n2p'].isna()])
+    # transient_df.var_p2n = stats.variance(transient_df.p2n[~transient_df['p2n'].isna()])
+    # transient_df.var_x2p = stats.variance(transient_df.x2p[~transient_df['x2p'].isna()])
+    # transient_df.var_p2x = stats.variance(transient_df.p2x[~transient_df['p2x'].isna()])
     # endregion
     # region Find which block/port/trial the mouse is in at the time of each peak
     transient_df['block'] = ''
     transient_df['port'] = ''
     transient_df['trial'] = ''
     for i in range(len(transient_df.index)):
-        closest_idx = find_closest_values(pi_events.time_recording, transient_df.peak_time[i])
+        closest_idx = find_closest_values(pi_events.time_recording.to_numpy(), transient_df.peak_time[i])
         transient_df.at[i, 'block'] = pi_events.phase[closest_idx]
         transient_df.at[i, 'port'] = pi_events.port[closest_idx]
         transient_df.at[i, 'trial'] = pi_events.trial[closest_idx]
@@ -194,12 +211,12 @@ def extract_transient_info(col_name, dFF0, pi_events, plot_zscore=0, plot=0):
 
     # endregion
     if plot:
-        plt.style.use('ggplot')
-        plt.plot(dFF0['time_recording'], dFF0[col_name]*100)
-        plt.plot(transient_df['peak_time'], transient_df['height']*100, '*', label='peak')
-        plt.plot(dFF0.time_recording[prominences[1]], dFF0[col_name].iloc[prominences[1]]*100, 'x',
+        fig, ax = plt.subplots(1, 1)
+        ax[0].plot(dFF0['time_recording'], dFF0[col_name]*100)
+        ax[0].plot(transient_df['peak_time'], transient_df['height']*100, '*', label='peak')
+        ax[0].plot(dFF0.time_recording[prominences[1]], dFF0.loc[prominences[1], col_name]*100, 'x',
                  label='start of transient')
-        plt.plot(dFF0.time_recording[prominences[2]], dFF0[col_name].iloc[prominences[2]]*100, 'x',
+        ax[0].plot(dFF0.time_recording[prominences[2]], dFF0.loc[prominences[2], col_name]*100, 'x',
                  label='end of transient')
         reward_time_exp = pi_events.time_recording[
             (pi_events.key == 'reward') & (pi_events.value == 1) & (pi_events.port == 1)]
@@ -207,17 +224,17 @@ def extract_transient_info(col_name, dFF0, pi_events, plot_zscore=0, plot=0):
             (pi_events.key == 'reward') & (pi_events.value == 1) & (pi_events.port == 2)]
         lick_time = pi_events.time_recording[
             (pi_events.key == 'lick') & (pi_events.value == 1)]
-        plt.scatter(reward_time_exp, [-2] * len(reward_time_exp), label="exp reward")
-        plt.scatter(reward_time_bg, [-2] * len(reward_time_bg), label="bg reward")
-        plt.scatter(lick_time, [-2.5] * len(lick_time), marker='|')
-        plt.vlines(x=pi_events.time_recording[pi_events.is_1st_encounter], ymin=-3, ymax=6,
+        ax[0].scatter(reward_time_exp, [-2] * len(reward_time_exp), label="exp reward")
+        ax[0].scatter(reward_time_bg, [-2] * len(reward_time_bg), label="bg reward")
+        ax[0].scatter(lick_time, [-2.5] * len(lick_time), marker='|')
+        ax[0].vlines(x=pi_events.time_recording[pi_events.is_1st_encounter], ymin=-3, ymax=6,
                    colors='grey', linestyles='dashdot', alpha=0.8, label='1st reward encounter')
         threshold = np.percentile(dFF0[col_name], 90)
-        plt.axhline(y=threshold*100, color='grey', linestyle='dotted', alpha=0.8, label='90th percentile')
-        plt.title(col_name)
-        plt.ylim([-3, 6])
-        plt.xlabel('Time (sec)')
-        plt.ylabel('dF/F0 (%)')
+        ax[0].axhline(y=threshold*100, color='grey', linestyle='dotted', alpha=0.8, label='90th percentile')
+        ax[0].title(col_name)
+        ax[0].ylim([-3, 6])
+        ax[0].xlabel('Time (sec)')
+        ax[0].ylabel('dF/F0 (%)')
         plt.show()
 
     return transient_df

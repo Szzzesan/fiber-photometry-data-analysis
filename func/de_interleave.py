@@ -18,17 +18,16 @@ def de_interleave(neural_events, session_label, save_path, plot='False', save='F
                                         'green_left_isos', 'time_raw']
 
     if plot:
+        fig, ax = plt.subplots(1, figsize=(15, 10))
         num_color_site = int(len(raw_neural_deinterleaved.columns) / 2 - 1)
-        plt.style.use('ggplot')
         for i in range(num_color_site):
-            plt.plot(raw_neural_deinterleaved.iloc[:, 0], raw_neural_deinterleaved.iloc[:, 2 * i + 1],
-                     label=raw_neural_deinterleaved.columns.values[2 * i + 1])
-            plt.plot(raw_neural_deinterleaved.iloc[:, 0], raw_neural_deinterleaved.iloc[:, 2 * (i + 1)],
-                     label=raw_neural_deinterleaved.columns.values[2 * (i + 1)])
-        # plt.legend()
+            ax.plot(raw_neural_deinterleaved.iloc[:, 0], raw_neural_deinterleaved.iloc[:, 2 * i + 1],
+                    label=raw_neural_deinterleaved.columns.values[2 * i + 1])
+            ax.plot(raw_neural_deinterleaved.iloc[:, 0], raw_neural_deinterleaved.iloc[:, 2 * (i + 1)],
+                    label=raw_neural_deinterleaved.columns.values[2 * (i + 1)])
+        plt.legend()
         plt.title(session_label + ' raw deinterleaved')
-        fig = plt.gcf()
-        plt.show()
+        fig.show()
 
         if save:
             isExist = os.path.exists(save_path)
@@ -38,5 +37,23 @@ def de_interleave(neural_events, session_label, save_path, plot='False', save='F
                 print("A new directory is created!")
             fig_name = os.path.join(save_path, 'raw_deinterleaved' + '.png')
             fig.savefig(fig_name)
+
+        # fig, ax = plt.subplots(3, figsize=(12, 9))
+        # ax[0].plot(raw_neural_deinterleaved.time_recording / 60000, raw_neural_deinterleaved.green_right_actual,
+        #            label='raw 470')
+        # ax[1].plot(raw_neural_deinterleaved.time_recording / 60000, raw_neural_deinterleaved.green_right_isos,
+        #            label='raw isos')
+        # ax[0].plot(raw_neural_deinterleaved.time_recording / 60000,
+        #            raw_neural_deinterleaved.green_right_actual.rolling(window=1000).mean(), label='470 rolling mean')
+        # ax[1].plot(raw_neural_deinterleaved.time_recording / 60000,
+        #            raw_neural_deinterleaved.green_right_isos.rolling(window=1000).mean(), label='isos rolling mean')
+        # ax[2].plot(raw_neural_deinterleaved.time_recording / 60000,
+        #            raw_neural_deinterleaved.green_right_actual.rolling(window=1000).std(), label='470 rolling std')
+        # ax[2].plot(raw_neural_deinterleaved.time_recording / 60000,
+        #            raw_neural_deinterleaved.green_right_isos.rolling(window=1000).std(), label='isos rolling std')
+        # ax[2].set_xlabel('Time (min)')
+        # for i in [0, 1, 2]:
+        #     ax[i].legend()
+        # fig.show()
 
     return raw_neural_deinterleaved
