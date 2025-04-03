@@ -203,6 +203,193 @@ def visualize_NRI_vs_amplitude_families(ani_summary, variable='time_in_port', bl
                 ani_summary.IRI_amp_ipsi['SEM_amp_high'] = stats.sem(amp_arr_high, axis=1)
 
 
+def visualize_NRI_reward_history_vs_DA(ani_summary):
+    df_list = []
+    for session in ani_summary.session_obj_list:
+        if session is not None:
+            df_temp = session.DA_NRI_block_priorrewards[
+                ['block', 'time_in_port_bin', 'num_rewards_prior_bin', 'right_DA_mean', 'left_DA_mean']].copy()
+            df_list.append(df_temp)
+    df_combined = pd.concat(df_list, ignore_index=True)
+    df_final = df_combined.groupby(['block', 'time_in_port_bin', 'num_rewards_prior_bin'])[
+        ['right_DA_mean', 'left_DA_mean']].agg(['mean', 'sem']).reset_index()
+    df_final.columns = ['block', 'time_in_port_bin', 'num_rewards_prior_bin', 'right_DA_mean', 'right_DA_sem',
+                        'left_DA_mean', 'left_DA_sem']
+
+    # Define unique values for styling
+    blocks = df_final['block'].unique()
+    prior_rewards = sorted(df_final['num_rewards_prior_bin'].unique())
+    prior_reward_labels = {0: '0-2 rewards', 1: '2-4', 2: '4-6', 3: '6-8', 4: '8-10'}
+    colors = sns.color_palette('Set2')  # Unique colors for blocks
+    sizes = np.linspace(50, 100, len(prior_rewards))  # Marker sizes
+    linewidths = np.linspace(1, 4, len(prior_rewards))  # Line thickness
+    capsizes = np.linspace(2.5, 5, len(prior_rewards))
+
+    def plot_DA(df, DA_col, DA_sem, title):
+        plt.figure(figsize=(7, 5))
+
+        for i, block in enumerate(blocks):
+            x_jitter = np.linspace(-0.1, 0.1, len(prior_rewards))
+            for j, prior in enumerate(prior_rewards):
+                subset = df[(df['block'] == block) & (df['num_rewards_prior_bin'] == prior)]
+                x_vals = subset['time_in_port_bin'] + x_jitter[j]  # X-axis: median of time bin
+                y_vals = subset[DA_col]  # Y-axis: DA mean
+                y_err = subset[DA_sem]  # Error bars: SEM
+
+                # Scatter plot with error bars
+                plt.errorbar(x_vals, y_vals, yerr=y_err, fmt='o',
+                             color=colors[i], markersize=sizes[j] / 10, capsize=capsizes[j],
+                             label=f"Block {block}, {prior_reward_labels[prior]} prior", alpha=0.7)
+
+                # Line connecting points
+                plt.plot(x_vals, y_vals, color=colors[i], linewidth=linewidths[j], alpha=0.7)
+
+        custom_xticks = [0, 1, 2, 3]  # Midpoints or bin edges
+        custom_xtick_labels = ["0-3", "3-6", "6-9", "9-12"]  # Desired labels
+        plt.xticks(custom_xticks, custom_xtick_labels)  # Apply new x-tick labels
+
+        plt.title(title)
+        plt.xlabel("Time since Entry (sec)")
+        plt.ylabel("DA Amplitude (mean ± SEM)")
+        plt.legend(loc="best", fontsize=8)
+        plt.grid(True)
+        plt.show()
+
+    # Create two separate figures
+    plot_DA(df_final, 'right_DA_mean', 'right_DA_sem', f'{ani_summary.animal} Right')
+    plot_DA(df_final, 'left_DA_mean', 'left_DA_sem', f'{ani_summary.animal} Left')
+
+    return df_final
+
+
+def stats_analysis_intervals_vs_DA(ani_summary):
+    df_list = []
+    for session in ani_summary.session_obj_list:
+        if session is not None:
+            df_temp = session.DA_vs_NRI_IRI.copy()
+            df_list.append(df_temp)
+    df_combined = pd.concat(df_list, ignore_index=True)
+    return df_combined
+
+
+# todo: change visualize_NRI_IRI_vs_DA according to the changes made to the DA_vs_NRI_IRI dataframe
+# def visualize_NRI_IRI_vs_DA(ani_summary, run_statistics=0, plot_scatters=0, plot_heatmaps=0):
+#     df_list = []
+#     for session in ani_summary.session_obj_list:
+#         if session is not None:
+#             df_temp = session.DA_vs_NRI_IRI[
+#                 ['NRI', 'IRI', 'DA_right', 'DA_left']].copy()
+#             df_list.append(df_temp)
+#     df_combined = pd.concat(df_list, ignore_index=True)
+#
+#     if run_statistics:
+#         # func.run_statistical_analysis(df_combined, 'pearson')
+#         # func.run_statistical_analysis(df_combined, 'spearman')
+#         func.run_statistical_analysis(df_combined, 'linear_regression')
+#         func.run_statistical_analysis(df_combined, 'ANOVA')
+#     def plot_DA_NRI_IRI_scatters(df, DA_col, title):
+#
+#         # Sort dataframe so that lower DA_col values (darker) are plotted first
+#         df_sorted = df.sort_values(by=DA_col, ascending=True)
+#         df_sorted['NRI'] = df_sorted['NRI'] + np.random.uniform(-0.05, 0.05, size=len(df))
+#         df_sorted['IRI'] = df_sorted['IRI'] + np.random.uniform(-0.05, 0.05, size=len(df))
+#
+#         fig, ax = plt.subplots(figsize=(14, 10))
+#         ax.set_facecolor('#888888')  # Medium gray background
+#         fig.patch.set_facecolor('#888888')  # Match figure background
+#         ax.set_title(title, color='white', fontsize=40)
+#         sns.scatterplot(ax=ax, x='NRI', y='IRI', hue=DA_col, data=df_sorted, palette='viridis', s=30, alpha=0.4,
+#                         edgecolor=None,
+#                         legend=False)
+#
+#         norm = plt.Normalize(df_sorted[DA_col].quantile(0.1), df_sorted[DA_col].quantile(0.8))
+#         sm = plt.cm.ScalarMappable(cmap="viridis", norm=norm)
+#         sm.set_array([])  # Needed for matplotlib colorbar
+#         cbar = fig.colorbar(sm, ax=ax)
+#         cbar.set_label('DA (in z-score)', color='white')
+#         cbar.outline.set_edgecolor('white')
+#         cbar.ax.yaxis.set_tick_params(color='white')  # Set tick color
+#         plt.setp(cbar.ax.get_yticklabels(), color='white')  # Set tick label color
+#
+#         ax.grid(color='white', linestyle='--', linewidth=0.5, alpha=0.7)
+#         ax.xaxis.label.set_color('white')
+#         ax.yaxis.label.set_color('white')
+#         ax.xaxis.label.set_size(18)
+#         ax.yaxis.label.set_size(18)
+#         ax.tick_params(axis='both', colors='white', labelsize=14)
+#         for spine in ax.spines.values():
+#             spine.set_edgecolor('white')
+#
+#         plt.show()
+#
+#     if plot_scatters:
+#         plot_DA_NRI_IRI_scatters(df_combined, 'DA_right', f"{ani_summary.animal} Right")
+#         plot_DA_NRI_IRI_scatters(df_combined, 'DA_left', f"{ani_summary.animal} Left")
+#
+#     def plot_DA_NRI_IRI_heatmaps(df, DA_col, title):
+#         # Define fixed bins (0-2, 2-4, ..., 18-20)
+#         x_bins = np.arange(0, 14, 1)  # Bins for NRI
+#         y_bins = np.arange(0, 7, 1)  # Bins for IRI
+#
+#         # Assign each point to a bin (labels are the bin start values)
+#         df['x_bin'] = pd.cut(df['NRI'], bins=x_bins, labels=x_bins[:-1])
+#         df['y_bin'] = pd.cut(df['IRI'], bins=y_bins, labels=y_bins[:-1])
+#
+#         # Compute the average value within each bin
+#         heatmap_data = df.groupby(['y_bin', 'x_bin'])[DA_col].mean().unstack()
+#         for i in range(min(heatmap_data.shape)):
+#             heatmap_data.iloc[i, i] = np.nan  # setting all the diagonal elements to nan
+#         heatmap_data = heatmap_data[::-1]
+#
+#         # Convert index and columns to numeric for plotting
+#         heatmap_data.index = heatmap_data.index.astype(float)
+#         heatmap_data.columns = heatmap_data.columns.astype(float)
+#
+#         # Normalize the colorbar using min and 70th percentile
+#         from matplotlib import colors
+#         vmin = df[DA_col].quantile(0.1)
+#         vmax = df[DA_col].quantile(0.8)  # 70th percentile
+#         norm = colors.Normalize(vmin=vmin, vmax=vmax)
+#
+#         # Create the figure and heatmap
+#         fig, ax = plt.subplots(figsize=(20, 8))
+#         sns.heatmap(heatmap_data, cmap='viridis', annot=True, fmt=".1f", linewidths=0.5, norm=norm, cbar=False)
+#
+#         # Create the colorbar with correct normalization
+#         sm = plt.cm.ScalarMappable(cmap="viridis", norm=norm)
+#         sm.set_array([])
+#         cbar = fig.colorbar(sm, ax=ax)
+#         cbar.set_label('DA (in z-score)', fontsize=14)
+#         cbar.ax.tick_params(labelsize=12)
+#
+#         ax.set_xticks(np.arange(len(x_bins[:-1])))
+#         ax.set_yticks(np.arange(len(y_bins[1:-1])) + 1)
+#         ax.set_xticklabels(x_bins[:-1])
+#         ax.set_yticklabels(y_bins[1:-1][::-1])  # reversed for correct order
+#
+#         # Label axes
+#         plt.xlabel('NRI Bins')
+#         plt.ylabel('IRI Bins')
+#         plt.title(title)
+#
+#         plt.show()
+#
+#     if plot_heatmaps:
+#         plot_DA_NRI_IRI_heatmaps(df_combined, 'DA_right', f"{ani_summary.animal} Right")
+#         plot_DA_NRI_IRI_heatmaps(df_combined, 'DA_left', f"{ani_summary.animal} Left")
+
+
+class Animal:
+    def __init__(self, animal_str, session_list=None, include_branch='both'):
+        self.animal_str = animal_str
+        self.session_obj_list = [None] * len(session_list) if session_list is not None else []
+        if session_list is not None:
+            for i in session_list:
+                self.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch)
+                self.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
+                self.session_obj_list[i].process_behavior_data(save=1)
+
+
 def multi_session_analysis(animal_str, session_list, include_branch='both'):
     lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
     animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
@@ -246,51 +433,90 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
             ani_summary.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch)
             # ani_summary.session_obj_list[i].examine_raw(save=1)
             ani_summary.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
-            ani_summary.session_obj_list[i].process_behavior_data()
+            ani_summary.session_obj_list[i].process_behavior_data(save=0)
             # ani_summary.session_obj_list[i].plot_bg_heatmaps(save=1)
             # ani_summary.session_obj_list[i].plot_heatmaps(save=1)
             # ani_summary.session_obj_list[i].actual_leave_vs_adjusted_optimal(save=0)
             # ani_summary.session_obj_list[i].extract_transient(plot_zscore=0)
             # ani_summary.session_obj_list[i].visualize_correlation_scatter(save=0)
-            ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
-                                                                     block_split=True,
-                                                                     plot_linecharts=0,
-                                                                     plot_histograms=0)
+            ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=1)
+            ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
+            # ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
+            #                                                          block_split=True,
+            #                                                          plot_linecharts=0,
+            #                                                          plot_histograms=0)
+
         except:
             print(f"skipped session {i} because of error!!!")
             print("----------------------------------")
             continue
     # ses_selected_l, ses_selected_r = visualize_transient_consistency(session_obj_list, save=1, save_path=xsession_figure_export_dir)
-    visualize_NRI_vs_amplitude_families(ani_summary, variable='time_in_port', block_split=True, normalized=False, save=False,
-                                        save_path=None)
-    return ani_summary
+    # visualize_NRI_vs_amplitude_families(ani_summary, variable='time_in_port', block_split=True, normalized=False, save=False,
+    #                                     save_path=None)
+    # df_DA_NRI_rewardhistory = visualize_NRI_reward_history_vs_DA(ani_summary)
+    # visualize_NRI_IRI_vs_DA(ani_summary, run_statistics=1,plot_heatmaps=0, plot_scatters=0)
+    stats_df = stats_analysis_intervals_vs_DA(ani_summary)
+    return stats_df, ani_summary
 
 
 if __name__ == '__main__':
     # multi
-    DAresponse = np.zeros(90)
+    # DAresponse = np.zeros(90)
 
     session_list = [1, 2, 3, 5, 7, 9, 11, 12, 14, 15, 19, 22, 23, 24, 25]
-    summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')
+    stats036, summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')
 
     session_list = [0, 1, 2, 4, 5, 6, 8, 9, 11, 15, 16, 17, 18, 19, 20, 22, 24, 25, 27, 28, 29, 31, 32, 33, 35]
-    summary_037 = multi_session_analysis('SZ037', session_list, include_branch='both')
+    stats037, summary_037 = multi_session_analysis('SZ037', session_list, include_branch='both')
 
     session_list = [1, 2, 3, 4, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 32,
                     33, 34, 35, 36, 37, 38]
-    summary_038 = multi_session_analysis('SZ038', session_list, include_branch='both')
+    stats038, summary_038 = multi_session_analysis('SZ038', session_list, include_branch='both')
 
     session_list = [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 22]
-    summary_039 = multi_session_analysis('SZ039', session_list, include_branch='only_left')
+    stats039, summary_039 = multi_session_analysis('SZ039', session_list, include_branch='only_left')
 
     # session_list = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22]
     # summary_041 = multi_session_analysis('SZ041', session_list, include_branch='only_right')
     session_list = [3, 5, 6, 7, 8, 9, 11, 13, 14, 16, 17, 18, 19, 21, 22, 24, 26, 27, 28, 30]
-    summary_042 = multi_session_analysis('SZ042', session_list, include_branch='both')
+    stats042, summary_042 = multi_session_analysis('SZ042', session_list, include_branch='both')
 
     session_list = [0, 1, 3, 4, 5, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23]
-    summary_043 = multi_session_analysis('SZ043', session_list, include_branch='only_right')
+    stats043, summary_043 = multi_session_analysis('SZ043', session_list, include_branch='only_right')
 
+    # mixed linear model regression and power analysis
+    df = pd.concat([stats036, stats037, stats038, stats039[stats039['hemisphere'] == 'left'],
+                    stats042[stats042['hemisphere'] == 'left'], stats043[stats043['hemisphere'] == 'right']],
+                   ignore_index=True)
+    # Step 1: Within-subject Linear Regression
+    import statsmodels.api as sm
+    # Dictionary to store regression results
+    results = {}
+    # Grouping by (animal, hemisphere)
+    for (animal, hemisphere), group in df.groupby(["animal", "hemisphere"]):
+        X = group[["NRI", "IRI"]]  # Predictor variables
+        X["NRI_IRI"] = X["NRI"] * X["IRI"]  # Interaction term
+        X = sm.add_constant(X)  # Adds intercept
+        y = group["DA"]  # Dependent variable
+        model = sm.OLS(y, X).fit()
+        results[(animal, hemisphere)] = model.params  # Store regression coefficients
+    # Convert results into a DataFrame for analysis
+    beta_df = pd.DataFrame.from_dict(results, orient="index", columns=["Intercept", "NRI", "IRI", "NRI_IRI"])
+    beta_df.index.names = ["Animal", "Hemisphere"]
+    print(beta_df)
+    # Step 2: Mixed-Effects Model
+    import statsmodels.formula.api as smf
+    df["subject"] = df[["animal", "hemisphere"]].apply(tuple, axis=1)  # Create subject ID
+    df["NRI_IRI"] = df["NRI"] * df["IRI"]  # Interaction term
+    model = smf.mixedlm("DA ~ NRI + IRI + NRI_IRI", df, groups=df["subject"]).fit()
+    print(model.summary())
+    # Step 3: Power Analysis
+    from statsmodels.stats.power import TTestPower
+    for predictor in ["NRI", "IRI", "NRI_IRI"]:
+        effect_size = abs(beta_df[predictor].mean()) / beta_df[predictor].std()
+        power_analysis = TTestPower()
+        power = power_analysis.power(effect_size=effect_size, nobs=len(beta_df), alpha=0.05)
+        print(f"Power for {predictor}: {power}")
     # 1-way ANOVA with repeated measures, the within-subject factor being time invested in exp port before rewarded
     # DAresponse[0:5] = summary_036.NRI_amp_contra.mean_amp.to_numpy()
     # DAresponse[5:10] = summary_036.NRI_amp_ipsi.mean_amp.to_numpy()

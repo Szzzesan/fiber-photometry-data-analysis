@@ -37,3 +37,5 @@ from .construct_matrix_for_average_traces import construct_matrix_for_average_tr
 from .extract_intervals import *
 from .add_subplot_axes import add_subplot_axes
 from .process_block_transition import process_block_transition
+from .run_statistical_analysis import run_statistical_analysis
+from .construct_reward_history_matrix import construct_reward_history_matrix
