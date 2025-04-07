@@ -378,16 +378,31 @@ def stats_analysis_intervals_vs_DA(ani_summary):
 #         plot_DA_NRI_IRI_heatmaps(df_combined, 'DA_right', f"{ani_summary.animal} Right")
 #         plot_DA_NRI_IRI_heatmaps(df_combined, 'DA_left', f"{ani_summary.animal} Left")
 
+def visualize_DA_vs_NRI(ani_summary):
+    df_list = []
+    for session in ani_summary.session_obj_list:
+        if session is not None:
+            df_temp = session.DA_vs_NRI_IRI[
+                ['hemisphere', 'block', 'NRI', 'IRI', 'DA']].copy()
+            df_list.append(df_temp)
+    df_combined = pd.concat(df_list, ignore_index=True)
+    ani_summary.DA_features['hemisphere'] = df_combined['hemisphere'].to_numpy()
+    ani_summary.DA_features['block'] = df_combined['block'].to_numpy()
+    ani_summary.DA_features['NRI'] = df_combined['NRI'].to_numpy()
+    ani_summary.DA_features['IRI'] = df_combined['IRI'].to_numpy()
+    ani_summary.DA_features['DA'] = df_combined['DA'].to_numpy()
 
-class Animal:
-    def __init__(self, animal_str, session_list=None, include_branch='both'):
-        self.animal_str = animal_str
-        self.session_obj_list = [None] * len(session_list) if session_list is not None else []
-        if session_list is not None:
-            for i in session_list:
-                self.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch)
-                self.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
-                self.session_obj_list[i].process_behavior_data(save=1)
+
+# todo: complete constructing the Animal class
+# class Animal:
+#     def __init__(self, animal_str, session_list=None, include_branch='both'):
+#         self.animal_str = animal_str
+#         self.session_obj_list = [None] * len(session_list) if session_list is not None else []
+#         if session_list is not None:
+#             for i in session_list:
+#                 self.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch)
+#                 self.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
+#                 self.session_obj_list[i].process_behavior_data(save=1)
 
 
 def multi_session_analysis(animal_str, session_list, include_branch='both'):
@@ -411,9 +426,12 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
     df4 = pd.DataFrame(
         columns=['median_interval', 'quart1_interval', 'quart3_interval', 'mean_amp', 'SEM_amp', 'mean_amp_low',
                  'SEM_amp_low', 'mean_amp_high', 'SEM_amp_high'])
+    df5 = pd.DataFrame(
+        columns=['hemisphere', 'block', 'NRI', 'IRI', 'DA']
+    )
     OneAniAllSes = namedtuple('OneAniAllSes',
                               ['animal', 'session_obj_list', 'NRI_amp_ipsi', 'NRI_amp_contra', 'IRI_amp_ipsi',
-                               'IRI_amp_contra'])
+                               'IRI_amp_contra', 'DA_features'])
 
     # check if the neural data files, the behavior data files, and the sync data files are of the same numbers
     if (len(FP_file_list) == len(behav_file_list)) & (len(behav_file_list) == len(TTL_file_list)):
@@ -425,7 +443,7 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
 
         # adding values to a named tuple
         ani_summary = OneAniAllSes(animal=animal_str, session_obj_list=[None] * len(FP_file_list), NRI_amp_ipsi=df1,
-                                   NRI_amp_contra=df2, IRI_amp_ipsi=df3, IRI_amp_contra=df4)
+                                   NRI_amp_contra=df2, IRI_amp_ipsi=df3, IRI_amp_contra=df4, DA_features=df5)
     else:
         print("Error: the numbers of different data files should be equal!!")
     for i in session_list:
@@ -439,7 +457,7 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
             # ani_summary.session_obj_list[i].actual_leave_vs_adjusted_optimal(save=0)
             # ani_summary.session_obj_list[i].extract_transient(plot_zscore=0)
             # ani_summary.session_obj_list[i].visualize_correlation_scatter(save=0)
-            ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=1)
+            ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=0)
             ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
             # ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
             #                                                          block_split=True,
@@ -455,8 +473,9 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
     #                                     save_path=None)
     # df_DA_NRI_rewardhistory = visualize_NRI_reward_history_vs_DA(ani_summary)
     # visualize_NRI_IRI_vs_DA(ani_summary, run_statistics=1,plot_heatmaps=0, plot_scatters=0)
-    stats_df = stats_analysis_intervals_vs_DA(ani_summary)
-    return stats_df, ani_summary
+    visualize_DA_vs_NRI(ani_summary)
+    # stats_df = stats_analysis_intervals_vs_DA(ani_summary)
+    return ani_summary
 
 
 if __name__ == '__main__':
@@ -464,25 +483,106 @@ if __name__ == '__main__':
     # DAresponse = np.zeros(90)
 
     session_list = [1, 2, 3, 5, 7, 9, 11, 12, 14, 15, 19, 22, 23, 24, 25]
-    stats036, summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')
+    summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')
 
     session_list = [0, 1, 2, 4, 5, 6, 8, 9, 11, 15, 16, 17, 18, 19, 20, 22, 24, 25, 27, 28, 29, 31, 32, 33, 35]
-    stats037, summary_037 = multi_session_analysis('SZ037', session_list, include_branch='both')
+    summary_037 = multi_session_analysis('SZ037', session_list, include_branch='both')
 
     session_list = [1, 2, 3, 4, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 32,
                     33, 34, 35, 36, 37, 38]
-    stats038, summary_038 = multi_session_analysis('SZ038', session_list, include_branch='both')
+    summary_038 = multi_session_analysis('SZ038', session_list, include_branch='both')
 
     session_list = [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 22]
-    stats039, summary_039 = multi_session_analysis('SZ039', session_list, include_branch='only_left')
+    summary_039 = multi_session_analysis('SZ039', session_list, include_branch='only_left')
 
     # session_list = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22]
     # summary_041 = multi_session_analysis('SZ041', session_list, include_branch='only_right')
     session_list = [3, 5, 6, 7, 8, 9, 11, 13, 14, 16, 17, 18, 19, 21, 22, 24, 26, 27, 28, 30]
-    stats042, summary_042 = multi_session_analysis('SZ042', session_list, include_branch='both')
+    summary_042 = multi_session_analysis('SZ042', session_list, include_branch='both')
 
     session_list = [0, 1, 3, 4, 5, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23]
-    stats043, summary_043 = multi_session_analysis('SZ043', session_list, include_branch='only_right')
+    summary_043 = multi_session_analysis('SZ043', session_list, include_branch='only_right')
+
+
+    # plot the 4-point line chart DA vs. NRI for each animal
+    def get_mean_sem_DA_for_feature(df, var='NRI'):
+        arr_mean = np.zeros(4)
+        arr_sem = np.zeros(4)
+        for i in range(4):
+            if var == 'NRI':
+                lower_bound = 3 * i
+                higher_bound = 3 * (i + 1)
+            if var == 'IRI':
+                lower_bound = 1.5 * i
+                higher_bound = 1.5 * (i + 1)
+            arr_mean[i] = df.loc[(df[var] > lower_bound) & (df[var] < higher_bound), 'DA'].mean()
+            arr_sem[i] = df.loc[(df[var] > lower_bound) & (df[var] < higher_bound), 'DA'].sem()
+        mean_sem_df = pd.DataFrame({'mean': arr_mean, 'sem': arr_sem})
+        return mean_sem_df
+
+
+    df1 = summary_036.DA_features
+    df2 = summary_037.DA_features
+    df3 = summary_038.DA_features
+    df4 = summary_039.DA_features[summary_039.DA_features['hemisphere'] == 'left']
+    df5 = summary_042.DA_features[summary_042.DA_features['hemisphere'] == 'left']
+    df6 = summary_043.DA_features[summary_043.DA_features['hemisphere'] == 'right']
+    fig, ax = plt.subplots()
+    for (df, name) in [(df1, 'SZ036'), (df2, 'SZ037'), (df3, 'SZ038'), (df4, 'SZ039'), (df5, 'SZ042'), (df6, 'SZ043')]:
+        # df = df[(df['IRI'] > 1) & (df['IRI'] < df['NRI'])]
+        to_plot_df = get_mean_sem_DA_for_feature(df, var='NRI')
+        x = np.array([1.5, 4.5, 7.5, 10.5])
+        # x = np.array([0.75, 2.25, 3.75, 5.25])
+        ax.errorbar(x, to_plot_df['mean'], yerr=to_plot_df['sem'], fmt='o-',capsize=5, label=name)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xlabel('Reward Time since Port Entry (sec)', fontsize=15)
+    plt.ylabel('DA (z-score)', fontsize=15)
+    plt.xticks(x, fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.title('DA vs NRI', fontsize=15)
+    plt.legend()
+    plt.show()
+
+
+
+    # Divided by Block
+    df_all = pd.concat([df1, df2, df3, df4, df5, df6], ignore_index=True)
+    x = np.array([1.5, 4.5, 7.5, 10.5])
+    df_all = df_all[(df_all['IRI'] > 1) & (df_all['IRI'] < df['NRI'])]
+    low_df = get_mean_sem_DA_for_feature(df_all[df_all['block']=='0.4'], var='NRI')
+    high_df = get_mean_sem_DA_for_feature(df_all[df_all['block']=='0.8'], var='NRI')
+    fig, ax = plt.subplots()
+    cpalette = sns.color_palette('Set2')
+    ax.errorbar(x, low_df['mean'], yerr=low_df['sem'], fmt='o-',capsize=5, label='low context', color=cpalette[0])
+    ax.errorbar(x, high_df['mean'], yerr=high_df['sem'], fmt='o-',capsize=5, label='high context', color=cpalette[1])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xlabel('Reward Time since Port Entry (sec)', fontsize=15)
+    plt.ylabel('DA (z-score)', fontsize=15)
+    plt.xticks(x, fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.title('Block Effect of DA', fontsize=15)
+    plt.legend()
+    plt.show()
+
+    # Divided by Hemisphere
+    df_all = pd.concat([df1, df2, df3])
+    contra_df = get_mean_sem_DA_for_feature(df_all[df_all['hemisphere'] == 'left'], var='NRI')
+    ipsi_df = get_mean_sem_DA_for_feature(df_all[df_all['hemisphere'] == 'right'], var='NRI')
+    fig, ax = plt.subplots()
+    cpalette = sns.color_palette('Set1')
+    ax.errorbar(x, contra_df['mean'], yerr=contra_df['sem'], fmt='o-', capsize=5, label='contralateral', color=cpalette[0])
+    ax.errorbar(x, ipsi_df['mean'], yerr=ipsi_df['sem'], fmt='o-', capsize=5, label='ipsilateral', color=cpalette[1])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xlabel('Reward Time since Port Entry (sec)', fontsize=15)
+    plt.ylabel('DA (z-score)', fontsize=15)
+    plt.xticks(x, fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.title('Hemisphere Effect of DA', fontsize=15)
+    plt.legend()
+    plt.show()
 
     # mixed linear model regression and power analysis
     df = pd.concat([stats036, stats037, stats038, stats039[stats039['hemisphere'] == 'left'],
@@ -490,6 +590,7 @@ if __name__ == '__main__':
                    ignore_index=True)
     # Step 1: Within-subject Linear Regression
     import statsmodels.api as sm
+
     # Dictionary to store regression results
     results = {}
     # Grouping by (animal, hemisphere)
@@ -506,12 +607,14 @@ if __name__ == '__main__':
     print(beta_df)
     # Step 2: Mixed-Effects Model
     import statsmodels.formula.api as smf
+
     df["subject"] = df[["animal", "hemisphere"]].apply(tuple, axis=1)  # Create subject ID
     df["NRI_IRI"] = df["NRI"] * df["IRI"]  # Interaction term
     model = smf.mixedlm("DA ~ NRI + IRI + NRI_IRI", df, groups=df["subject"]).fit()
     print(model.summary())
     # Step 3: Power Analysis
     from statsmodels.stats.power import TTestPower
+
     for predictor in ["NRI", "IRI", "NRI_IRI"]:
         effect_size = abs(beta_df[predictor].mean()) / beta_df[predictor].std()
         power_analysis = TTestPower()
