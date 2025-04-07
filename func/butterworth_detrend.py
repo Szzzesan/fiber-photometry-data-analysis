@@ -4,9 +4,9 @@ import numpy as np
 
 
 def butterworth_detrend(raw_separated, session_label, fps=80, plot='False'):
-    y1 = raw_separated['green_right_actual'].to_numpy(copy=True)
+    y1 = raw_separated['green_right_470'].to_numpy(copy=True)
     y2 = raw_separated['green_right_isos'].to_numpy(copy=True)
-    y3 = raw_separated['green_left_actual'].to_numpy(copy=True)
+    y3 = raw_separated['green_left_470'].to_numpy(copy=True)
     y4 = raw_separated['green_left_isos'].to_numpy(copy=True)
     detrended = raw_separated
     sos = signal.butter(2, 0.1, btype='highpass', fs=fps / 2, output='sos')
@@ -21,9 +21,9 @@ def butterworth_detrend(raw_separated, session_label, fps=80, plot='False'):
 
     if plot:
         xs = detrended['time_recording']/60
-        detrended_r470 = detrended['green_right_actual'].to_numpy()
+        detrended_r470 = detrended['green_right_470'].to_numpy()
         detrended_r405 = detrended['green_right_isos'].to_numpy()
-        detrended_l470 = detrended['green_left_actual'].to_numpy()
+        detrended_l470 = detrended['green_left_470'].to_numpy()
         detrended_l405 = detrended['green_left_isos'].to_numpy()
         fig, axes = plt.subplots(4, 2, figsize=(24, 10), sharex=True)
         fig.subplots_adjust(hspace=0)
