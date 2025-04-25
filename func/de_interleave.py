@@ -4,17 +4,17 @@ import os
 
 
 def de_interleave(neural_events, session_label, save_path, plot='False', save='False'):
-    green_right_actual = neural_events[neural_events.signal_type == 'actual'].green_right.to_numpy()
+    green_right_470 = neural_events[neural_events.signal_type == 'actual'].green_right.to_numpy()
     green_right_isos = neural_events[neural_events.signal_type == 'isosbestic'].green_right.to_numpy()
-    green_left_actual = neural_events[neural_events.signal_type == 'actual'].green_left.to_numpy()
+    green_left_470 = neural_events[neural_events.signal_type == 'actual'].green_left.to_numpy()
     green_left_isos = neural_events[neural_events.signal_type == 'isosbestic'].green_left.to_numpy()
     time_raw = neural_events[neural_events.signal_type == 'actual'].timestamps
     time_recording = time_raw - neural_events.timestamps[0]
     time_recording = time_recording.to_numpy()
     raw_neural_deinterleaved = pd.DataFrame(
-        data=[time_recording, green_right_actual, green_right_isos, green_left_actual,
+        data=[time_recording, green_right_470, green_right_isos, green_left_470,
               green_left_isos, time_raw.to_numpy()]).T
-    raw_neural_deinterleaved.columns = ['time_recording', 'green_right_actual', 'green_right_isos', 'green_left_actual',
+    raw_neural_deinterleaved.columns = ['time_recording', 'green_right_470', 'green_right_isos', 'green_left_470',
                                         'green_left_isos', 'time_raw']
 
     if plot:
@@ -39,16 +39,16 @@ def de_interleave(neural_events, session_label, save_path, plot='False', save='F
             fig.savefig(fig_name)
 
         # fig, ax = plt.subplots(3, figsize=(12, 9))
-        # ax[0].plot(raw_neural_deinterleaved.time_recording / 60000, raw_neural_deinterleaved.green_right_actual,
+        # ax[0].plot(raw_neural_deinterleaved.time_recording / 60000, raw_neural_deinterleaved.green_right_470,
         #            label='raw 470')
         # ax[1].plot(raw_neural_deinterleaved.time_recording / 60000, raw_neural_deinterleaved.green_right_isos,
         #            label='raw isos')
         # ax[0].plot(raw_neural_deinterleaved.time_recording / 60000,
-        #            raw_neural_deinterleaved.green_right_actual.rolling(window=1000).mean(), label='470 rolling mean')
+        #            raw_neural_deinterleaved.green_right_470.rolling(window=1000).mean(), label='470 rolling mean')
         # ax[1].plot(raw_neural_deinterleaved.time_recording / 60000,
         #            raw_neural_deinterleaved.green_right_isos.rolling(window=1000).mean(), label='isos rolling mean')
         # ax[2].plot(raw_neural_deinterleaved.time_recording / 60000,
-        #            raw_neural_deinterleaved.green_right_actual.rolling(window=1000).std(), label='470 rolling std')
+        #            raw_neural_deinterleaved.green_right_470.rolling(window=1000).std(), label='470 rolling std')
         # ax[2].plot(raw_neural_deinterleaved.time_recording / 60000,
         #            raw_neural_deinterleaved.green_right_isos.rolling(window=1000).std(), label='isos rolling std')
         # ax[2].set_xlabel('Time (min)')

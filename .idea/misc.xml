@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="py39" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="fp_analysis" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="shichen_fp_analysis" project-jdk-type="Python SDK" />
 </project>

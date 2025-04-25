@@ -13,8 +13,11 @@ class OneSession:
     def __init__(self, animal_str, session, include_branch='both'):
         self.include_branch = include_branch
 
-        lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
-        self.animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
+        # lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
+        # self.animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
+        # raw_dir = os.path.join(self.animal_dir, 'raw_data')
+        lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
+        self.animal_dir = os.path.join(lab_dir, animal_str)
         raw_dir = os.path.join(self.animal_dir, 'raw_data')
         FP_file_list = func.list_files_by_time(raw_dir, file_type='FP', print_names=0)
         behav_file_list = func.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
@@ -25,6 +28,7 @@ class OneSession:
         self.signal_dir = os.path.join(self.animal_dir, 'raw_data', FP_file_list[session])
         self.arduino_dir = os.path.join(self.animal_dir, 'raw_data', TTL_file_list[session])
         self.fig_export_dir = os.path.join(self.animal_dir, 'figures', self.signal_dir[-21:-7])
+        self.processed_dir = os.path.join(self.animal_dir, 'processed_data')
         print("This class is" + " session " + self.signal_dir[-23:-7])
         self.pi_events, self.neural_events = func.data_read_sync(self.behav_dir, self.signal_dir, self.arduino_dir)
         if self.pi_events['task'].iloc[10] == 'single_reward':
@@ -563,7 +567,7 @@ class OneSession:
                                                       ses_str=self.signal_dir[-21:-7])
         print('hello')
 
-    def extract_binned_da_vs_reward_history_matrix(self, binsize=0.1):
+    def extract_binned_da_vs_reward_history_matrix(self, binsize=0.1, save=0):
         condition_exp_entry = (self.pi_events['key'] == 'head') & (self.pi_events['value'] == 1) & (
                 self.pi_events['port'] == 1) & (self.pi_events['is_valid'])
         condition_exp_exit = (self.pi_events['key'] == 'head') & (self.pi_events['value'] == 0) & (
@@ -599,15 +603,22 @@ class OneSession:
             reward_num_in_bin[i] = reward_rows.sum()
         binned_means['reward_num'] = reward_num_in_bin
         binned_means['trial'] = trial
+        binned_means['animal'] = self.animal
         binned_means = func.construct_reward_history_matrix(binned_means, binsize=binsize)
+        if save:
+            df_to_save = binned_means[['animal', 'trial', 'bin', 'bin_idx', 'reward_num', 'green_right', 'green_left', 'history_matrix_sparse']]
+            if self.include_branch == 'only_left':
+                df_to_save['green_right'] = np.nan
+            elif self.include_branch == 'only_right':
+                df_to_save['green_left'] = np.nan
+            df_to_save.to_pickle(os.path.join(self.processed_dir, 'binned_DA_reward_history', f'{self.animal}_{self.signal_dir[-23:-7]}_binned_DA_vs_history.pkl'))
 
-        print('hello')
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ036', 13, include_branch='both')
+    test_session = OneSession('RK006', 3, include_branch='both')
     # test_session.examine_raw(save=0)
-    test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
+    test_session.calculate_dFF0(plot=1, plot_middle_step=1, save=1)
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
     # test_session.extract_transient(plot_zscore=0)
@@ -616,14 +627,14 @@ if __name__ == '__main__':
     # test_session.plot_bg_heatmaps(save=0)
     # test_session.actual_leave_vs_adjusted_optimal(save=0)
     test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
-    # df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
-    #                                                          block_split=False,
-    #                                                          plot_histograms=0, plot_linecharts=1)
-    test_session.visualize_DA_vs_NRI_IRI(plot_scatters=0, plot_histograms=0)
+    df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
+                                                             block_split=False,
+                                                             plot_histograms=0, plot_linecharts=1)
+    # test_session.visualize_DA_vs_NRI_IRI(plot_scatters=0, plot_histograms=0)
     # test_session.bg_port_in_block_reversal()
 
     # test_session.scatterplot_nonreward_DA_vs_NRI()
-    test_session.for_pub_compare_traces_by_NRI(branch='green_left')
-    # test_session.extract_binned_da_vs_reward_history_matrix(binsize=0.1)
+    # test_session.for_pub_compare_traces_by_NRI(branch='green_left')
+    test_session.extract_binned_da_vs_reward_history_matrix(binsize=0.1, save=0)
 
     print("Hello")

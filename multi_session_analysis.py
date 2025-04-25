@@ -2,6 +2,8 @@ import os
 import func
 from OneSession import OneSession
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.rcParams['figure.dpi'] = 300
 import seaborn as sns
 import numpy as np
 import statistics
@@ -378,6 +380,7 @@ def stats_analysis_intervals_vs_DA(ani_summary):
 #         plot_DA_NRI_IRI_heatmaps(df_combined, 'DA_right', f"{ani_summary.animal} Right")
 #         plot_DA_NRI_IRI_heatmaps(df_combined, 'DA_left', f"{ani_summary.animal} Left")
 
+# updates the DA_features dataframe for the animal summary
 def visualize_DA_vs_NRI(ani_summary):
     df_list = []
     for session in ani_summary.session_obj_list:
@@ -386,6 +389,7 @@ def visualize_DA_vs_NRI(ani_summary):
                 ['hemisphere', 'block', 'NRI', 'IRI', 'DA']].copy()
             df_list.append(df_temp)
     df_combined = pd.concat(df_list, ignore_index=True)
+    ani_summary.DA_features['animal'] = ani_summary.animal
     ani_summary.DA_features['hemisphere'] = df_combined['hemisphere'].to_numpy()
     ani_summary.DA_features['block'] = df_combined['block'].to_numpy()
     ani_summary.DA_features['NRI'] = df_combined['NRI'].to_numpy()
@@ -406,8 +410,11 @@ def visualize_DA_vs_NRI(ani_summary):
 
 
 def multi_session_analysis(animal_str, session_list, include_branch='both'):
-    lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
-    animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
+    # lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
+    # animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
+    # raw_dir = os.path.join(animal_dir, 'raw_data')
+    lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
+    animal_dir = os.path.join(lab_dir, animal_str)
     raw_dir = os.path.join(animal_dir, 'raw_data')
     FP_file_list = func.list_files_by_time(raw_dir, file_type='FP', print_names=0)
     behav_file_list = func.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
@@ -427,7 +434,7 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
         columns=['median_interval', 'quart1_interval', 'quart3_interval', 'mean_amp', 'SEM_amp', 'mean_amp_low',
                  'SEM_amp_low', 'mean_amp_high', 'SEM_amp_high'])
     df5 = pd.DataFrame(
-        columns=['hemisphere', 'block', 'NRI', 'IRI', 'DA']
+        columns=['animal', 'hemisphere', 'block', 'NRI', 'IRI', 'DA']
     )
     OneAniAllSes = namedtuple('OneAniAllSes',
                               ['animal', 'session_obj_list', 'NRI_amp_ipsi', 'NRI_amp_contra', 'IRI_amp_ipsi',
@@ -457,12 +464,13 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
             # ani_summary.session_obj_list[i].actual_leave_vs_adjusted_optimal(save=0)
             # ani_summary.session_obj_list[i].extract_transient(plot_zscore=0)
             # ani_summary.session_obj_list[i].visualize_correlation_scatter(save=0)
-            ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=0)
+            # ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=0)
             ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
             # ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
             #                                                          block_split=True,
             #                                                          plot_linecharts=0,
             #                                                          plot_histograms=0)
+            # ani_summary.session_obj_list[i].extract_binned_da_vs_reward_history_matrix(binsize=0.1, save=1)
 
         except:
             print(f"skipped session {i} because of error!!!")
@@ -498,49 +506,75 @@ if __name__ == '__main__':
     # session_list = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22]
     # summary_041 = multi_session_analysis('SZ041', session_list, include_branch='only_right')
     session_list = [3, 5, 6, 7, 8, 9, 11, 13, 14, 16, 17, 18, 19, 21, 22, 24, 26, 27, 28, 30]
-    summary_042 = multi_session_analysis('SZ042', session_list, include_branch='both')
+    summary_042 = multi_session_analysis('SZ042', session_list, include_branch='only_left')
 
     session_list = [0, 1, 3, 4, 5, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23]
     summary_043 = multi_session_analysis('SZ043', session_list, include_branch='only_right')
 
 
     # plot the 4-point line chart DA vs. NRI for each animal
-    def get_mean_sem_DA_for_feature(df, var='NRI'):
-        arr_mean = np.zeros(4)
-        arr_sem = np.zeros(4)
-        for i in range(4):
-            if var == 'NRI':
-                lower_bound = 3 * i
-                higher_bound = 3 * (i + 1)
-            if var == 'IRI':
-                lower_bound = 1.5 * i
-                higher_bound = 1.5 * (i + 1)
-            arr_mean[i] = df.loc[(df[var] > lower_bound) & (df[var] < higher_bound), 'DA'].mean()
-            arr_sem[i] = df.loc[(df[var] > lower_bound) & (df[var] < higher_bound), 'DA'].sem()
-        mean_sem_df = pd.DataFrame({'mean': arr_mean, 'sem': arr_sem})
+    def get_mean_sem_DA_for_feature(df, var='NRI', sample_per_bin=250):
+        df_sorted = df.sort_values(by=var).reset_index(drop=True)
+        total_sample = len(df_sorted)
+        bin_num = int(total_sample / sample_per_bin)
+        arr_bin_median = np.zeros(bin_num)
+        arr_mean = np.zeros(bin_num)
+        arr_sem = np.zeros(bin_num)
+        for i in range(bin_num):
+            # if var == 'NRI':
+            #     lower_bound = 3 * i
+            #     higher_bound = 3 * (i + 1)
+            # if var == 'IRI':
+            #     lower_bound = 1.5 * i
+            #     higher_bound = 1.5 * (i + 1)
+            arr_bin_median[i] = (df_sorted.iloc[sample_per_bin*i][var] + df_sorted.iloc[sample_per_bin*(i+1)-1][var])/2
+            arr_mean[i] = df_sorted.iloc[sample_per_bin*i:sample_per_bin*(i+1)]['DA'].mean()
+            arr_sem[i] = df_sorted.iloc[sample_per_bin*i:sample_per_bin*(i+1)]['DA'].sem()
+        mean_sem_df = pd.DataFrame({'bin_center': arr_bin_median, 'mean': arr_mean, 'sem': arr_sem})
         return mean_sem_df
 
+    # This is the simple exponential decreasing
+    def exp_decreasing(x, cumulative=8., starting=1.):
+        a = starting
+        b = a / cumulative
+        density = a / np.exp(b * x)
+        return density
 
+    # Plot DA vs NRI/IRI for each animal
     df1 = summary_036.DA_features
     df2 = summary_037.DA_features
     df3 = summary_038.DA_features
-    df4 = summary_039.DA_features[summary_039.DA_features['hemisphere'] == 'left']
-    df5 = summary_042.DA_features[summary_042.DA_features['hemisphere'] == 'left']
-    df6 = summary_043.DA_features[summary_043.DA_features['hemisphere'] == 'right']
+    df4 = summary_039.DA_features[summary_039.DA_features['hemisphere'] == 'left'].reset_index(drop=True)
+    df5 = summary_042.DA_features[summary_042.DA_features['hemisphere'] == 'left'].reset_index(drop=True)
+    df6 = summary_043.DA_features[summary_043.DA_features['hemisphere'] == 'right'].reset_index(drop=True)
+    # xticks = np.array([1, 3, 5, 7, 9, 11])
+    # xticks = np.array([1, 2, 3, 4, 5])
+    xticks = np.array([1, 3, 5, 7, 9, 11])
     fig, ax = plt.subplots()
     for (df, name) in [(df1, 'SZ036'), (df2, 'SZ037'), (df3, 'SZ038'), (df4, 'SZ039'), (df5, 'SZ042'), (df6, 'SZ043')]:
         # df = df[(df['IRI'] > 1) & (df['IRI'] < df['NRI'])]
-        to_plot_df = get_mean_sem_DA_for_feature(df, var='NRI')
-        x = np.array([1.5, 4.5, 7.5, 10.5])
-        # x = np.array([0.75, 2.25, 3.75, 5.25])
-        ax.errorbar(x, to_plot_df['mean'], yerr=to_plot_df['sem'], fmt='o-',capsize=5, label=name)
+        df = df[(df['IRI'] > 1)]
+        to_plot_df = get_mean_sem_DA_for_feature(df, var='NRI', sample_per_bin=400)
+        x = to_plot_df['bin_center']
+        y = to_plot_df['mean']
+        y_err = to_plot_df['sem']
+        ax.plot(x, y, label=name)
+        ax.fill_between(x, y - y_err, y + y_err, alpha=0.2)
+        # ax.errorbar(to_plot_df['bin_center'], to_plot_df['mean'], yerr=to_plot_df['sem'], fmt='o-',capsize=5, label=name)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    plt.xlabel('Reward Time since Port Entry (sec)', fontsize=15)
-    plt.ylabel('DA (z-score)', fontsize=15)
-    plt.xticks(x, fontsize=15)
+    ax.set_ylabel('DA (z-score)', fontsize=15)
+    plt.xlabel('Reward Time since Entry (sec)', fontsize=15)
+    plt.xticks(xticks, fontsize=15)
+    ax2 = ax.twinx()
+    x = np.arange(0, 12, 0.1)
+    y = exp_decreasing(x, cumulative=8., starting=1.)
+    ax2.plot(x, y/10, color='gray', linestyle='--', linewidth=1.5, label='Reward Probability')
+    ax2.set_zorder(0)
+    ax2.patch.set_visible(False)
+    ax2.set_ylim(0, 0.12)
     plt.yticks(fontsize=15)
-    plt.title('DA vs NRI', fontsize=15)
+    plt.title('DA vs NRI (sample/bin=400)', fontsize=15)
     plt.legend()
     plt.show()
 
@@ -548,39 +582,58 @@ if __name__ == '__main__':
 
     # Divided by Block
     df_all = pd.concat([df1, df2, df3, df4, df5, df6], ignore_index=True)
-    x = np.array([1.5, 4.5, 7.5, 10.5])
-    df_all = df_all[(df_all['IRI'] > 1) & (df_all['IRI'] < df['NRI'])]
-    low_df = get_mean_sem_DA_for_feature(df_all[df_all['block']=='0.4'], var='NRI')
-    high_df = get_mean_sem_DA_for_feature(df_all[df_all['block']=='0.8'], var='NRI')
+    xticks = np.array([1, 3, 5, 7, 9, 11])
+    df_all = df_all[(df_all['IRI'] > 1) & (df_all['IRI'] < df_all['NRI'])]
+    low_df = get_mean_sem_DA_for_feature(df_all[df_all['block']=='0.4'], var='NRI', sample_per_bin=700)
+    high_df = get_mean_sem_DA_for_feature(df_all[df_all['block']=='0.8'], var='NRI', sample_per_bin=700)
     fig, ax = plt.subplots()
     cpalette = sns.color_palette('Set2')
-    ax.errorbar(x, low_df['mean'], yerr=low_df['sem'], fmt='o-',capsize=5, label='low context', color=cpalette[0])
-    ax.errorbar(x, high_df['mean'], yerr=high_df['sem'], fmt='o-',capsize=5, label='high context', color=cpalette[1])
+    x = low_df['bin_center']
+    y = low_df['mean']
+    y_err = low_df['sem']
+    ax.plot(x, y, label='Low Context', color=cpalette[0])
+    ax.fill_between(x, y - y_err, y + y_err, color=cpalette[0], alpha=0.2)
+    x = high_df['bin_center']
+    y = high_df['mean']
+    y_err = high_df['sem']
+    ax.plot(x, y, label='High Context', color=cpalette[1])
+    ax.fill_between(x, y - y_err, y + y_err, color=cpalette[1], alpha=0.2)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     plt.xlabel('Reward Time since Port Entry (sec)', fontsize=15)
     plt.ylabel('DA (z-score)', fontsize=15)
-    plt.xticks(x, fontsize=15)
+    plt.xticks(xticks, fontsize=15)
     plt.yticks(fontsize=15)
-    plt.title('Block Effect of DA', fontsize=15)
+    plt.title('Block Effect of DA (sample/bin=700)', fontsize=15)
     plt.legend()
     plt.show()
 
     # Divided by Hemisphere
     df_all = pd.concat([df1, df2, df3])
-    contra_df = get_mean_sem_DA_for_feature(df_all[df_all['hemisphere'] == 'left'], var='NRI')
-    ipsi_df = get_mean_sem_DA_for_feature(df_all[df_all['hemisphere'] == 'right'], var='NRI')
+    contra_df = get_mean_sem_DA_for_feature(df_all[df_all['hemisphere'] == 'left'], var='NRI', sample_per_bin=600)
+    ipsi_df = get_mean_sem_DA_for_feature(df_all[df_all['hemisphere'] == 'right'], var='NRI', sample_per_bin=600)
+    xticks=[1, 3, 5, 7, 9, 11]
     fig, ax = plt.subplots()
     cpalette = sns.color_palette('Set1')
-    ax.errorbar(x, contra_df['mean'], yerr=contra_df['sem'], fmt='o-', capsize=5, label='contralateral', color=cpalette[0])
-    ax.errorbar(x, ipsi_df['mean'], yerr=ipsi_df['sem'], fmt='o-', capsize=5, label='ipsilateral', color=cpalette[1])
+    x = contra_df['bin_center']
+    y = contra_df['mean']
+    y_err = contra_df['sem']
+    ax.plot(x, y, label='Contralateral', color=cpalette[0])
+    ax.fill_between(x, y - y_err, y + y_err, color=cpalette[0], alpha=0.2)
+    x = ipsi_df['bin_center']
+    y = ipsi_df['mean']
+    y_err = ipsi_df['sem']
+    ax.plot(x, y, label='Ipsilateral', color=cpalette[1])
+    ax.fill_between(x, y - y_err, y + y_err, color=cpalette[1], alpha=0.2)
+    # ax.errorbar(x, contra_df['mean'], yerr=contra_df['sem'], fmt='o-', capsize=5, label='contralateral', color=cpalette[0])
+    # ax.errorbar(x, ipsi_df['mean'], yerr=ipsi_df['sem'], fmt='o-', capsize=5, label='ipsilateral', color=cpalette[1])
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     plt.xlabel('Reward Time since Port Entry (sec)', fontsize=15)
     plt.ylabel('DA (z-score)', fontsize=15)
-    plt.xticks(x, fontsize=15)
+    plt.xticks(xticks, fontsize=15)
     plt.yticks(fontsize=15)
-    plt.title('Hemisphere Effect of DA', fontsize=15)
+    plt.title('Hemisphere Effect of DA (sample/bin=600)', fontsize=15)
     plt.legend()
     plt.show()
 
