@@ -27,7 +27,7 @@ def get_valid_entry_exit(pi_events):
 
     exp_entries = pi_events[(pi_events.key == 'head') & (pi_events.value == 1) & (pi_events.port == 1)]
     exp_exits = pi_events[(pi_events.key == 'head') & (pi_events.value == 0) & (pi_events.port == 1)]
-    bg_entries = pi_events[(pi_events.key == 'trial') & (pi_events.value == 1) & (pi_events.port == 2)]
+    bg_entries = pi_events[(pi_events.key == 'trial') & (pi_events.value == 1)]
     bg_exits = pi_events[(pi_events.key == 'head') & (pi_events.value == 0) & (pi_events.port == 2)]
 
     vid_bg_entries, vid_exp_exits = get_interlocked_arrays(bg_entries.index.to_numpy(), exp_exits.index.to_numpy(),

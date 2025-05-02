@@ -10,7 +10,7 @@ import func
 
 
 class OneSession:
-    def __init__(self, animal_str, session, include_branch='both'):
+    def __init__(self, animal_str, session, include_branch='both', port_swap=0):
         self.include_branch = include_branch
 
         # lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
@@ -37,7 +37,11 @@ class OneSession:
             self.task = 'multi_reward'
 
         self.block_palette = sns.color_palette('Set2')
-
+        self.port_swap = port_swap
+        if self.port_swap:
+            self.pi_events.loc[self.pi_events['port'] == 2, 'port'] = 3
+            self.pi_events.loc[self.pi_events['port'] == 1, 'port'] = 2
+            self.pi_events.loc[self.pi_events['port'] == 3, 'port'] = 1
         self.dFF0 = None
         self.zscore = None
         self.idx_taskbegin = None
@@ -616,8 +620,8 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('RK006', 3, include_branch='both')
-    # test_session.examine_raw(save=0)
+    test_session = OneSession('RK006', 13, include_branch='both', port_swap=1)
+    test_session.examine_raw(save=1)
     test_session.calculate_dFF0(plot=1, plot_middle_step=1, save=1)
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
@@ -626,7 +630,7 @@ if __name__ == '__main__':
     # test_session.plot_heatmaps(save=1)
     # test_session.plot_bg_heatmaps(save=0)
     # test_session.actual_leave_vs_adjusted_optimal(save=0)
-    test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
+    test_session.extract_reward_features_and_DA(plot=1, save_dataframe=0)
     df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
                                                              block_split=False,
                                                              plot_histograms=0, plot_linecharts=1)
