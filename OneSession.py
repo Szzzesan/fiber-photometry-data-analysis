@@ -284,9 +284,9 @@ class OneSession:
 
             # Define median interval values based on method
             if method == 'even_time':
-                interval_vals = [1.5, 4.5, 7.5, 10.5] if variable == 'time_in_port' else [0.75, 2.25, 3.75, 5.25]
+                interval_vals = [1, 3, 5, 7] if variable == 'time_in_port' else [0.75, 2.25, 3.75, 5.25]
             elif method == 'overall_quint':
-                df_IRI_exp['NRI_quintile'] = pd.qcut(df_IRI_exp[variable], q=5, labels=False)
+                df_IRI_exp['NRI_quintile'] = pd.qcut(df_IRI_exp[variable], q=4, labels=False)
                 interval_vals = df_IRI_exp.groupby('NRI_quintile')[variable].median().to_numpy()
             avr_all[:, 0] = avr_low[:, 0] = avr_high[:, 0] = interval_vals
 
@@ -297,7 +297,7 @@ class OneSession:
             for i, quintile in enumerate(range(4)):
                 # Filter trials based on method
                 if method == 'even_time':
-                    lower_bound, upper_bound = (3 * i, 3 * (i + 1)) if variable == 'time_in_port' else (1.5 * i, 1.5 * (i + 1))
+                    lower_bound, upper_bound = (2 * i, 2 * (i + 1)) if variable == 'time_in_port' else (1.5 * i, 1.5 * (i + 1))
                     df = df_IRI_exp[(df_IRI_exp[variable] > lower_bound) & (df_IRI_exp[variable] < upper_bound)]
                 else:  # 'overall_quint'
                     df = df_IRI_exp[df_IRI_exp['NRI_quintile'] == quintile]
@@ -307,54 +307,59 @@ class OneSession:
                 title = f'rewarded at {label} since {"entry" if variable == "time_in_port" else "last reward"}'
 
                 # Compute average traces
-                df_avg, df_trial_info = func.construct_matrix_for_average_traces(
-                    self.zscore, branch,
-                    df.loc[df['next_reward_time'].notna(), 'reward_time'].to_numpy(),
-                    df.loc[df['next_reward_time'].notna(), 'next_reward_time'].to_numpy(),
-                    df.loc[df['next_reward_time'].notna(), 'trial'].to_numpy(),
-                    df.loc[df['next_reward_time'].notna(), 'block'].to_numpy(),
-                    interval_name=None
-                )
+                if df.loc[df['next_reward_time'].notna(), 'reward_time'].to_numpy().shape[0] == 0:
+                    print(f"No valid trials for {branch} in group {i+1}, skipping...")
+                    continue
+                else:
+                    df_avg, df_trial_info = func.construct_matrix_for_average_traces(
+                        self.zscore, branch,
+                        df.loc[df['next_reward_time'].notna(), 'reward_time'].to_numpy(),
+                        df.loc[df['next_reward_time'].notna(), 'next_reward_time'].to_numpy(),
+                        df.loc[df['next_reward_time'].notna(), 'trial'].to_numpy(),
+                        df.loc[df['next_reward_time'].notna(), 'block'].to_numpy(),
+                        interval_name=None
+                    )
 
-                # Compute peak amplitude differences
-                time_mask = df_avg.columns < 0.5
-                peak_diff = df_avg.loc[:, time_mask].mean().max() - df_avg.loc[:, time_mask].mean().min()
-                avr_all[i, 1] = peak_diff
+                    # Compute peak amplitude differences
+                    time_mask = df_avg.columns < 0.5
+                    peak_diff = df_avg.loc[:, time_mask].mean().max() - df_avg.loc[:, time_mask].mean().min()
+                    avr_all[i, 1] = peak_diff
 
-                # Block-based analysis
-                is_low_block = df_trial_info['phase'] == '0.4'
-                is_high_block = df_trial_info['phase'] == '0.8'
-                avr_low[i, 1] = df_avg[is_low_block].loc[:, time_mask].mean().max() - df_avg.loc[:,
-                                                                                      time_mask].mean().min()
-                avr_high[i, 1] = df_avg[is_high_block].loc[:, time_mask].mean().max() - df_avg.loc[:,
-                                                                                        time_mask].mean().min()
+                    # Block-based analysis
+                    is_low_block = df_trial_info['phase'] == '0.4'
+                    is_high_block = df_trial_info['phase'] == '0.8'
+                    avr_low[i, 1] = df_avg[is_low_block].loc[:, time_mask].mean().max() - df_avg.loc[:,
+                                                                                          time_mask].mean().min()
+                    avr_high[i, 1] = df_avg[is_high_block].loc[:, time_mask].mean().max() - df_avg.loc[:,
+                                                                                            time_mask].mean().min()
 
-                # Plotting (if enabled)
-                if plot_linecharts:
-                    ax = axes[i % 2, i // 2]
-                    if block_split:
-                        for j in range(df_avg[is_high_block].shape[0]):
-                            ax.plot(df_avg[is_high_block].iloc[j],
-                                    c=sns.light_palette(self.block_palette[1], as_cmap=True)(j))
-                        for j in range(df_avg[is_low_block].shape[0]):
-                            ax.plot(df_avg[is_low_block].iloc[j],
-                                    c=sns.light_palette(self.block_palette[0], as_cmap=True)(j))
+                    # Plotting (if enabled)
+                    if plot_linecharts:
+                        ax = axes[i % 2, i // 2]
+                        if block_split:
+                            for j in range(df_avg[is_high_block].shape[0]):
+                                ax.plot(df_avg[is_high_block].iloc[j],
+                                        c=sns.light_palette(self.block_palette[1], as_cmap=True)(j))
+                            for j in range(df_avg[is_low_block].shape[0]):
+                                ax.plot(df_avg[is_low_block].iloc[j],
+                                        c=sns.light_palette(self.block_palette[0], as_cmap=True)(j))
 
-                        ax.plot(df_avg[is_low_block].mean(axis=0), c=self.block_palette[0], linewidth=3,
-                                label='0.4 block')
-                        ax.plot(df_avg[is_high_block].mean(axis=0), c=self.block_palette[1], linewidth=3,
-                                label='0.8 block')
-                    else:
-                        for j in range(df_avg.shape[0]):
-                            weight = np.round(0.8 - (j + 1) / (df_avg.shape[0] + 1) * 0.4, 2)
-                            ax.plot(df_avg.iloc[j], c=str(weight))
-                        ax.plot(df_avg.mean(axis=0), c='b', linewidth=2.5)
+                            ax.plot(df_avg[is_low_block].mean(axis=0), c=self.block_palette[0], linewidth=3,
+                                    label='0.4 block')
+                            ax.plot(df_avg[is_high_block].mean(axis=0), c=self.block_palette[1], linewidth=3,
+                                    label='0.8 block')
+                        else:
+                            for j in range(df_avg.shape[0]):
+                                weight = np.round(0.8 - (j + 1) / (df_avg.shape[0] + 1) * 0.4, 2)
+                                ax.plot(df_avg.iloc[j], c=str(weight))
+                            ax.plot(df_avg.mean(axis=0), c='b', linewidth=2.5)
 
-                    # axes[2, 1].plot(df_avg.mean(axis=0), linewidth=2.5, label=label)  # equal time range
-                    # axes[2, 1].set_title('All Average IRI Traces')
-                    # axes[2, 1].legend(loc='upper right')
-                    ax.set_title(title, fontsize=15)
-                    ax.legend()
+                        # axes[2, 1].plot(df_avg.mean(axis=0), linewidth=2.5, label=label)  # equal time range
+                        # axes[2, 1].set_title('All Average IRI Traces')
+                        # axes[2, 1].legend(loc='upper right')
+                        ax.set_ylim([-2, 3])
+                        ax.set_title(title, fontsize=15)
+                        ax.legend()
 
             # Summary panel in linecharts
             if plot_linecharts:
@@ -620,7 +625,7 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('RK006', 13, include_branch='both', port_swap=1)
+    test_session = OneSession('RK003', 6, include_branch='both', port_swap=0)
     test_session.examine_raw(save=1)
     test_session.calculate_dFF0(plot=1, plot_middle_step=1, save=1)
     # test_session.remove_outliers_dFF0()
