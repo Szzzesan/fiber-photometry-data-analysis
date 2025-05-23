@@ -3,6 +3,7 @@ import func
 from OneSession import OneSession
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+
 mpl.rcParams['figure.dpi'] = 300
 import seaborn as sns
 import numpy as np
@@ -409,7 +410,7 @@ def visualize_DA_vs_NRI(ani_summary):
 #                 self.session_obj_list[i].process_behavior_data(save=1)
 
 
-def multi_session_analysis(animal_str, session_list, include_branch='both'):
+def multi_session_analysis(animal_str, session_list, include_branch='both', port_swap=0):
     # lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
     # animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
     # raw_dir = os.path.join(animal_dir, 'raw_data')
@@ -455,7 +456,8 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
         print("Error: the numbers of different data files should be equal!!")
     for i in session_list:
         try:
-            ani_summary.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch)
+            ani_summary.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch,
+                                                         port_swap=port_swap)
             # ani_summary.session_obj_list[i].examine_raw(save=1)
             ani_summary.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
             ani_summary.session_obj_list[i].process_behavior_data(save=0)
@@ -489,6 +491,18 @@ def multi_session_analysis(animal_str, session_list, include_branch='both'):
 if __name__ == '__main__':
     # multi
     # DAresponse = np.zeros(90)
+
+    session_list = [0, 2, 4, 6, 8, 10, 13, 15, 17, 20, 21, 22, 23, 24]
+    summary_RK1 = multi_session_analysis('RK001', session_list, include_branch='both', port_swap=0)
+
+    session_list = [1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 25]
+    summary_RK3 = multi_session_analysis('RK003', session_list, include_branch='both', port_swap=0)
+
+    session_list = [3, 5, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17]
+    summary_RK5 = multi_session_analysis('RK005', session_list, include_branch='both', port_swap=0)
+
+    session_list = [0, 1, 2, 4, 11, 12, 13, 14, 15, 17, 18, 20, 22, 23, 24]
+    summary_RK6 = multi_session_analysis('RK006', session_list, include_branch='both', port_swap=1)
 
     session_list = [1, 2, 3, 5, 7, 9, 11, 12, 14, 15, 19, 22, 23, 24, 25]
     summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')
@@ -527,11 +541,13 @@ if __name__ == '__main__':
             # if var == 'IRI':
             #     lower_bound = 1.5 * i
             #     higher_bound = 1.5 * (i + 1)
-            arr_bin_median[i] = (df_sorted.iloc[sample_per_bin*i][var] + df_sorted.iloc[sample_per_bin*(i+1)-1][var])/2
-            arr_mean[i] = df_sorted.iloc[sample_per_bin*i:sample_per_bin*(i+1)]['DA'].mean()
-            arr_sem[i] = df_sorted.iloc[sample_per_bin*i:sample_per_bin*(i+1)]['DA'].sem()
+            arr_bin_median[i] = (df_sorted.iloc[sample_per_bin * i][var] + df_sorted.iloc[sample_per_bin * (i + 1) - 1][
+                var]) / 2
+            arr_mean[i] = df_sorted.iloc[sample_per_bin * i:sample_per_bin * (i + 1)]['DA'].mean()
+            arr_sem[i] = df_sorted.iloc[sample_per_bin * i:sample_per_bin * (i + 1)]['DA'].sem()
         mean_sem_df = pd.DataFrame({'bin_center': arr_bin_median, 'mean': arr_mean, 'sem': arr_sem})
         return mean_sem_df
+
 
     # This is the simple exponential decreasing
     def exp_decreasing(x, cumulative=8., starting=1.):
@@ -539,6 +555,7 @@ if __name__ == '__main__':
         b = a / cumulative
         density = a / np.exp(b * x)
         return density
+
 
     # Plot DA vs NRI/IRI for each animal
     df1 = summary_036.DA_features
@@ -569,7 +586,7 @@ if __name__ == '__main__':
     ax2 = ax.twinx()
     x = np.arange(0, 12, 0.1)
     y = exp_decreasing(x, cumulative=8., starting=1.)
-    ax2.plot(x, y/10, color='gray', linestyle='--', linewidth=1.5, label='Reward Probability')
+    ax2.plot(x, y / 10, color='gray', linestyle='--', linewidth=1.5, label='Reward Probability')
     ax2.set_zorder(0)
     ax2.patch.set_visible(False)
     ax2.set_ylim(0, 0.12)
@@ -578,14 +595,12 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
 
-
-
     # Divided by Block
     df_all = pd.concat([df1, df2, df3, df4, df5, df6], ignore_index=True)
     xticks = np.array([1, 3, 5, 7, 9, 11])
     df_all = df_all[(df_all['IRI'] > 1) & (df_all['IRI'] < df_all['NRI'])]
-    low_df = get_mean_sem_DA_for_feature(df_all[df_all['block']=='0.4'], var='NRI', sample_per_bin=700)
-    high_df = get_mean_sem_DA_for_feature(df_all[df_all['block']=='0.8'], var='NRI', sample_per_bin=700)
+    low_df = get_mean_sem_DA_for_feature(df_all[df_all['block'] == '0.4'], var='NRI', sample_per_bin=700)
+    high_df = get_mean_sem_DA_for_feature(df_all[df_all['block'] == '0.8'], var='NRI', sample_per_bin=700)
     fig, ax = plt.subplots()
     cpalette = sns.color_palette('Set2')
     x = low_df['bin_center']
@@ -612,7 +627,7 @@ if __name__ == '__main__':
     df_all = pd.concat([df1, df2, df3])
     contra_df = get_mean_sem_DA_for_feature(df_all[df_all['hemisphere'] == 'left'], var='NRI', sample_per_bin=600)
     ipsi_df = get_mean_sem_DA_for_feature(df_all[df_all['hemisphere'] == 'right'], var='NRI', sample_per_bin=600)
-    xticks=[1, 3, 5, 7, 9, 11]
+    xticks = [1, 3, 5, 7, 9, 11]
     fig, ax = plt.subplots()
     cpalette = sns.color_palette('Set1')
     x = contra_df['bin_center']

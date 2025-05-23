@@ -26,7 +26,8 @@ def extract_intervals_expreward(pi_events, plot_histograms=0, ani_str='animal', 
     first_rewards_times = df_intervals.loc[first_rewards_idx, 'reward_time'].to_numpy()
     last_bg_rewards = np.searchsorted(arr_reward_bg, first_rewards_times, side='right') - 1
     valid_bg_mask = (last_bg_rewards > 0)
-    df_intervals.loc[first_rewards_idx[valid_bg_mask], 'last_reward_time'] = arr_reward_bg[last_bg_rewards[valid_bg_mask]]
+    df_intervals.loc[first_rewards_idx[valid_bg_mask], 'last_reward_time'] = arr_reward_bg[
+        last_bg_rewards[valid_bg_mask]]
     df_intervals['IRI_prior'] = df_intervals['reward_time'] - df_intervals['last_reward_time']
     df_intervals['IRI_post'] = df_intervals['next_reward_time'] - df_intervals['reward_time']
     df_intervals.reset_index(inplace=True, drop=True)
@@ -52,6 +53,7 @@ def extract_intervals_expreward(pi_events, plot_histograms=0, ani_str='animal', 
         arr_recent_reward_rate_exp[i] = pi_events.loc[is_in_range & is_reward & is_exp].shape[0] / (
                 search_end - search_begin)
         arr_local_reward_rate_1sec[i] = pi_events.loc[is_in_1sec & is_reward].shape[0]
+
         # find the exponential port entries and exits for each trial
         def extract_single_time(time_values, trial, event_type):
             if time_values.shape[0] == 1:
@@ -64,7 +66,6 @@ def extract_intervals_expreward(pi_events, plot_histograms=0, ani_str='animal', 
 
         time_entry = pi_events.loc[is_trial & is_exp & is_entry, 'time_recording'].to_numpy()
         time_exit = pi_events.loc[is_trial & is_exp & is_exit, 'time_recording'].to_numpy()
-
         arr_exp_entries[i] = extract_single_time(time_entry, df_intervals.loc[i, 'trial'], "entry")
         arr_exp_exits[i] = extract_single_time(time_exit, df_intervals.loc[i, 'trial'], "exit")
 
@@ -106,7 +107,6 @@ def extract_intervals_bg_inport(pi_events, plot_histograms=0, ani_str='animal', 
     is_bg_entry = (pi_events['key'] == 'trial') & (pi_events['value'] == 1) & pi_events['is_valid']
     is_bg_exit = (pi_events['port'] == 2) & (pi_events['key'] == 'head') & (pi_events['value'] == 0) & pi_events[
         'is_valid']
-
 
     arr_bg_entry = pi_events.loc[is_bg_entry, 'time_recording'].to_numpy()
     arr_bg_exit = pi_events.loc[is_bg_exit, 'time_recording'].to_numpy()
