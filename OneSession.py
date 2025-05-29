@@ -13,12 +13,12 @@ class OneSession:
     def __init__(self, animal_str, session, include_branch='both', port_swap=0):
         self.include_branch = include_branch
 
-        # lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
-        # self.animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
-        # raw_dir = os.path.join(self.animal_dir, 'raw_data')
-        lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
-        self.animal_dir = os.path.join(lab_dir, animal_str)
+        lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
+        self.animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
         raw_dir = os.path.join(self.animal_dir, 'raw_data')
+        # lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
+        # self.animal_dir = os.path.join(lab_dir, animal_str)
+        # raw_dir = os.path.join(self.animal_dir, 'raw_data')
         FP_file_list = func.list_files_by_time(raw_dir, file_type='FP', print_names=0)
         behav_file_list = func.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
         TTL_file_list = func.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
@@ -63,6 +63,7 @@ class OneSession:
         self.reward_features_DA = pd.DataFrame()
         self.DA_NRI_block_priorrewards = pd.DataFrame()
         self.DA_vs_NRI_IRI = pd.DataFrame()
+        self.bg_behav_by_trial = pd.DataFrame()
 
     def examine_raw(self, save=0):
         func.check_framedrop(self.neural_events)
@@ -108,6 +109,134 @@ class OneSession:
     def actual_leave_vs_adjusted_optimal(self, save=0):
         self.intervals_df = func.make_intervals_df(self.pi_events)
         func.visualize_adjusted_optimal(self.intervals_df, save=save, save_path=self.fig_export_dir)
+
+    def extract_bg_behav_by_trial(self):
+        is_trial_start = (self.pi_events['key'] == 'trial') & (self.pi_events['value'] == 1)
+        is_lick = (self.pi_events['key'] == 'lick') & (self.pi_events['value'] == 1)
+        is_reward = (self.pi_events['key'] == 'reward') & (self.pi_events['value'] == 1)
+        is_exit = (self.pi_events['key'] == 'head') & (self.pi_events['value'] == 0) & (self.pi_events['is_valid'])
+        is_context = self.pi_events['port'] == 2
+        bg_entries_df = self.pi_events[is_trial_start & self.pi_events['is_valid']]
+        bg_entry_times = bg_entries_df['time_recording'].values
+        bg_entry_trial_ids = bg_entries_df['trial'].values
+        bg_exits_df = self.pi_events[is_exit & is_context]
+        bg_exit_times = bg_exits_df['time_recording'].values
+        bg_exit_trial_ids = bg_exits_df['trial'].values
+
+        bg_licks_df = self.pi_events[is_lick & is_context]
+        bg_lick_times = bg_licks_df['time_recording'].values
+        bg_rewards_df = self.pi_events[is_reward & is_context]
+        bg_reward_times = bg_rewards_df['time_recording'].values
+
+        # examine if entries and exits match and correspond to the same trials
+        are_trials_aligned_and_match = False  # Flag to indicate successful validation
+        if len(bg_entry_trial_ids) == 0:
+            print("No valid entry trials found. Cannot perform alignment check.")
+            if len(bg_exit_trial_ids) == 0:
+                print("No valid exit trials found either. Considering this 'aligned' as both are empty.")
+                are_trials_aligned_and_match = True  # Or False, based on desired strictness
+        elif len(bg_entry_trial_ids) != len(bg_exit_trial_ids):
+            print(f"VALIDATION FAILED: Mismatch in the number of detected entries and exits.")
+            print(f"Number of entry trials: {len(bg_entry_trial_ids)}")
+            print(f"Number of exit trials: {len(bg_exit_trial_ids)}")
+            # For debugging, you might want to see the trial IDs:
+            # print(f"Entry trial IDs: {bg_entry_trial_ids}")
+            # print(f"Exit trial IDs: {bg_exit_trial_ids}")
+        elif 'trial' not in bg_exits_df.columns:  # Second check if exits_df was problematic
+            print("VALIDATION SKIPPED for trial ID sequence: 'trial' column was missing in exit data.")
+        else:
+            # Lengths are the same, and both have trial IDs, now check if the sequences are identical
+            if np.array_equal(bg_entry_trial_ids, bg_exit_trial_ids):
+                print(f"VALIDATION PASSED: Entries and exits are aligned for {len(bg_entry_trial_ids)} trials.")
+                print(f"Trial ID sequence: {bg_entry_trial_ids[:10]}..." if len(
+                    bg_entry_trial_ids) > 10 else bg_entry_trial_ids)  # Print a sample
+                are_trials_aligned_and_match = True
+            else:
+                print("VALIDATION FAILED: Entry and exit counts match, but their trial ID sequences differ.")
+                # Find the first mismatch for a more specific error message
+                mismatches = bg_entry_trial_ids != bg_exit_trial_ids
+                first_mismatch_index = np.where(mismatches)[0]
+                if len(first_mismatch_index) > 0:
+                    idx = first_mismatch_index[0]
+                    print(f"First mismatch occurs at index {idx}:")
+                    print(f"  Entry trial ID: {bg_entry_trial_ids[idx]}, Exit trial ID: {bg_exit_trial_ids[idx]}")
+                # Optionally, count total mismatches:
+                # print(f"Total number of mismatched trial IDs: {np.sum(mismatches)}")
+        # define the time window around port entry to plot
+        time_window_before = -0.3
+        time_window_after = 15
+        aligned_licks_by_trial = []
+        aligned_rewards_by_trial = []
+        aligned_exits_by_trial = []
+        if len(bg_entry_times) == 0:
+            print("No port 2 entry events found. Cannot create raster plot.")
+        else:
+            for trial_idx, entry_time in enumerate(bg_entry_times):
+                filter_left = entry_time + time_window_before
+                filter_right = min(bg_exit_times[trial_idx], entry_time + time_window_after)
+                trial_licks_abs = bg_lick_times[(bg_lick_times > filter_left) & (bg_lick_times < filter_right)]
+                trial_rewards_abs = bg_reward_times[(bg_reward_times > filter_left) & (bg_reward_times < bg_exit_times[trial_idx])]
+                trial_licks_relative = trial_licks_abs - entry_time
+                trial_rewards_relative = trial_rewards_abs - entry_time
+                trial_exits_relative = bg_exit_times[trial_idx] - entry_time
+                aligned_licks_by_trial.append(list(trial_licks_relative))
+                aligned_rewards_by_trial.append(list(trial_rewards_relative))
+                aligned_exits_by_trial.append([trial_exits_relative])
+        self.bg_behav_by_trial
+    def bg_lick_rasterplot(self):
+        is_trial_start = (self.pi_events['key'] == 'trial') & (self.pi_events['value'] == 1)
+        is_lick = (self.pi_events['key'] == 'lick') & (self.pi_events['value'] == 1)
+        is_reward = (self.pi_events['key'] == 'reward') & (self.pi_events['value'] == 1)
+        is_exit = (self.pi_events['key'] == 'head') & (self.pi_events['value'] == 0) & (self.pi_events['is_valid'])
+        is_context = self.pi_events['port'] == 2
+        bg_entries_df = self.pi_events[is_trial_start & self.pi_events['is_valid']]
+        bg_entry_times = bg_entries_df['time_recording'].values
+        bg_exits_df = self.pi_events[is_exit & is_context]
+        bg_exit_times = bg_exits_df['time_recording'].values
+        bg_licks_df = self.pi_events[is_lick & is_context]
+        bg_lick_times = bg_licks_df['time_recording'].values
+        bg_rewards_df = self.pi_events[is_reward & is_context]
+        bg_reward_times = bg_rewards_df['time_recording'].values
+        # define the time window around port entry to plot
+        time_window_before = -0.3
+        time_window_after = 15
+        aligned_licks_by_trial = []
+        aligned_rewards_by_trial = []
+        aligned_exits_by_trial = []
+        if len(bg_entry_times) == 0:
+            print("No port 2 entry events found. Cannot create raster plot.")
+        else:
+            for trial_idx, entry_time in enumerate(bg_entry_times):
+                filter_left = entry_time + time_window_before
+                filter_right = min(bg_exit_times[trial_idx], entry_time + time_window_after)
+                trial_licks_abs = bg_lick_times[(bg_lick_times > filter_left) & (bg_lick_times < filter_right)]
+                trial_rewards_abs = bg_reward_times[(bg_reward_times > filter_left) & (bg_reward_times < bg_exit_times[trial_idx])]
+                trial_licks_relative = trial_licks_abs - entry_time
+                trial_rewards_relative = trial_rewards_abs - entry_time
+                trial_exits_relative = bg_exit_times[trial_idx] - entry_time
+                aligned_licks_by_trial.append(list(trial_licks_relative))
+                aligned_rewards_by_trial.append(list(trial_rewards_relative))
+                aligned_exits_by_trial.append([trial_exits_relative])
+
+        if not any(aligned_licks_by_trial):
+            print("No licks found within the defined time window. Plot will be empty or not generated. ")
+        else:
+            fig, ax = plt.subplots(figsize=(10, max(6, len(bg_entry_times) * 0.3)))
+            ax.eventplot(aligned_licks_by_trial, colors='darkgrey',
+                         lineoffsets=np.arange(len(aligned_licks_by_trial)) + 1.5, linelengths=0.8, linewidths=1)
+            ax.eventplot(aligned_rewards_by_trial, colors='blue',
+                         lineoffsets=np.arange(len(aligned_licks_by_trial)) + 1.5, linelengths=1, linewidths=1.5)
+            ax.eventplot(aligned_exits_by_trial, colors='red', lineoffsets=np.arange(len(aligned_licks_by_trial)) + 1.5,
+                         linelengths=1, linewidths=1.5)
+            ax.axvline(0, color='red', linestyle='--', linewidth=1, label='Entry')
+            # plt.eventplot(aligned_licks_by_trial, colors='black', lineoffsets=np.arange(len(aligned_licks_by_trial)),
+            #               linelengths=0.8, linewidths=1)
+            ax.set_ylim([1, len(aligned_licks_by_trial) + 1])
+            ax.set_xlim([-0.3, 15])
+            ax.set_yticks([1, 10, 20, 30, 40, 50])
+            ax.invert_yaxis()
+            fig.show()
+            print('temporary pause here')
 
     def plot_bg_heatmaps(self, save=0):
         cbarmin_l = int(np.nanpercentile(self.dFF0['green_left'].values, 0.1) * 100)
@@ -297,7 +426,8 @@ class OneSession:
             for i, quintile in enumerate(range(4)):
                 # Filter trials based on method
                 if method == 'even_time':
-                    lower_bound, upper_bound = (2 * i, 2 * (i + 1)) if variable == 'time_in_port' else (1.5 * i, 1.5 * (i + 1))
+                    lower_bound, upper_bound = (2 * i, 2 * (i + 1)) if variable == 'time_in_port' else (
+                        1.5 * i, 1.5 * (i + 1))
                     df = df_IRI_exp[(df_IRI_exp[variable] > lower_bound) & (df_IRI_exp[variable] < upper_bound)]
                 else:  # 'overall_quint'
                     df = df_IRI_exp[df_IRI_exp['NRI_quintile'] == quintile]
@@ -308,7 +438,7 @@ class OneSession:
 
                 # Compute average traces
                 if df.loc[df['next_reward_time'].notna(), 'reward_time'].to_numpy().shape[0] == 0:
-                    print(f"No valid trials for {branch} in group {i+1}, skipping...")
+                    print(f"No valid trials for {branch} in group {i + 1}, skipping...")
                     continue
                 else:
                     df_avg, df_trial_info = func.construct_matrix_for_average_traces(
@@ -519,7 +649,6 @@ class OneSession:
 
             fig.show()
 
-
             selected_dfs = [time_series_list[i] for i in [0, 2, 4]]
             mean_traces = []
             sem_traces = []
@@ -541,7 +670,7 @@ class OneSession:
             pre_map = sns.light_palette(high_color, n_colors=4, reverse=False)
             post_map = sns.light_palette(low_color, n_colors=8, reverse=True)
             colors = pre_map[2:4] + post_map[0:4]
-            legends=['trial -2', 'trial -1', 'trial 0', 'trial 1', 'trial 2', 'trial 3']
+            legends = ['trial -2', 'trial -1', 'trial 0', 'trial 1', 'trial 2', 'trial 3']
             for i in range(mean_df.shape[0]):
                 ax.plot(mean_df.iloc[i], color=colors[i], linewidth=1.5, label=legends[i])
                 # ax.fill_between(mean_df.columns, mean_df.iloc[i] - sem_df.iloc[i], mean_df.iloc[i] + sem_df.iloc[i],
@@ -638,7 +767,7 @@ class OneSession:
         trial = np.full(binned_means.shape[0], np.nan)
         for i, bin_interval in enumerate(binned_means['bin']):
             rows_bool = (self.pi_events['time_recording'] >= bin_interval.left) & (
-                        self.pi_events['time_recording'] < bin_interval.right)
+                    self.pi_events['time_recording'] < bin_interval.right)
             trial_array = self.pi_events.loc[rows_bool, 'trial'].to_numpy()
             if trial_array.size > 0:
                 trial[i] = trial_array[0]
@@ -651,24 +780,26 @@ class OneSession:
         binned_means['animal'] = self.animal
         binned_means = func.construct_reward_history_matrix(binned_means, binsize=binsize)
         if save:
-            df_to_save = binned_means[['animal', 'trial', 'bin', 'bin_idx', 'reward_num', 'green_right', 'green_left', 'history_matrix_sparse']]
+            df_to_save = binned_means[['animal', 'trial', 'bin', 'bin_idx', 'reward_num', 'green_right', 'green_left',
+                                       'history_matrix_sparse']]
             if self.include_branch == 'only_left':
                 df_to_save['green_right'] = np.nan
             elif self.include_branch == 'only_right':
                 df_to_save['green_left'] = np.nan
-            df_to_save.to_pickle(os.path.join(self.processed_dir, 'binned_DA_reward_history', f'{self.animal}_{self.signal_dir[-23:-7]}_binned_DA_vs_history.pkl'))
-
+            df_to_save.to_pickle(os.path.join(self.processed_dir, 'binned_DA_reward_history',
+                                              f'{self.animal}_{self.signal_dir[-23:-7]}_binned_DA_vs_history.pkl'))
 
 
 if __name__ == '__main__':
-    test_session = OneSession('RK003', 5, include_branch='both', port_swap=0)
-    test_session.examine_raw(save=0)
+    test_session = OneSession('SZ043', 23, include_branch='both', port_swap=0)
+    # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
+    test_session.bg_lick_rasterplot()
     # test_session.extract_transient(plot_zscore=0)
     # test_session.visualize_correlation_scatter(save=0)
-    # test_session.plot_heatmaps(save=1)
+    test_session.plot_heatmaps(save=1)
     # test_session.plot_bg_heatmaps(save=0)
     # test_session.actual_leave_vs_adjusted_optimal(save=0)
     test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
