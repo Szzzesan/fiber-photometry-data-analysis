@@ -114,12 +114,14 @@ class OneSession:
         is_trial_start = (self.pi_events['key'] == 'trial') & (self.pi_events['value'] == 1)
         is_lick = (self.pi_events['key'] == 'lick') & (self.pi_events['value'] == 1)
         is_reward = (self.pi_events['key'] == 'reward') & (self.pi_events['value'] == 1)
-        is_exit = (self.pi_events['key'] == 'head') & (self.pi_events['value'] == 0) & (self.pi_events['is_valid'])
+        is_entry = (self.pi_events['key'] == 'head') & (self.pi_events['value'] == 1)
+        is_exit = (self.pi_events['key'] == 'head') & (self.pi_events['value'] == 0)
+        is_valid = (self.pi_events['is_valid'] == 1)
         is_context = self.pi_events['port'] == 2
         bg_entries_df = self.pi_events[is_trial_start & self.pi_events['is_valid']]
         bg_entry_times = bg_entries_df['time_recording'].values
         bg_entry_trial_ids = bg_entries_df['trial'].values
-        bg_exits_df = self.pi_events[is_exit & is_context]
+        bg_exits_df = self.pi_events[is_exit & is_valid & is_context]
         bg_exit_times = bg_exits_df['time_recording'].values
         bg_exit_trial_ids = bg_exits_df['trial'].values
 
@@ -127,7 +129,10 @@ class OneSession:
         bg_lick_times = bg_licks_df['time_recording'].values
         bg_rewards_df = self.pi_events[is_reward & is_context]
         bg_reward_times = bg_rewards_df['time_recording'].values
-
+        bg_excessive_entries_df = self.pi_events[is_entry]
+        bg_excessive_entry_times = bg_excessive_entries_df['time_recording'].values
+        bg_excessive_exits_df = self.pi_events[is_exit & (~is_valid)]
+        bg_excessive_exit_times = bg_excessive_exits_df['time_recording'].values
         # examine if entries and exits match and correspond to the same trials
         are_trials_aligned_and_match = False  # Flag to indicate successful validation
         if len(bg_entry_trial_ids) == 0:
@@ -160,29 +165,43 @@ class OneSession:
                     idx = first_mismatch_index[0]
                     print(f"First mismatch occurs at index {idx}:")
                     print(f"  Entry trial ID: {bg_entry_trial_ids[idx]}, Exit trial ID: {bg_exit_trial_ids[idx]}")
-                # Optionally, count total mismatches:
-                # print(f"Total number of mismatched trial IDs: {np.sum(mismatches)}")
-        # define the time window around port entry to plot
-        time_window_before = -0.3
-        time_window_after = 15
-        aligned_licks_by_trial = []
-        aligned_rewards_by_trial = []
-        aligned_exits_by_trial = []
-        if len(bg_entry_times) == 0:
-            print("No port 2 entry events found. Cannot create raster plot.")
+        # --- Decision point based on validation ---
+        if not are_trials_aligned_and_match:
+            print("CRITICAL WARNING: Entry and exit trial data are NOT aligned as expected. "
+                  "Using 'bg_exit_times[i]' to correspond to 'bg_entry_times[i]' "
+                  "based on index will likely lead to incorrect trial pairings.")
         else:
-            for trial_idx, entry_time in enumerate(bg_entry_times):
-                filter_left = entry_time + time_window_before
-                filter_right = min(bg_exit_times[trial_idx], entry_time + time_window_after)
-                trial_licks_abs = bg_lick_times[(bg_lick_times > filter_left) & (bg_lick_times < filter_right)]
-                trial_rewards_abs = bg_reward_times[(bg_reward_times > filter_left) & (bg_reward_times < bg_exit_times[trial_idx])]
-                trial_licks_relative = trial_licks_abs - entry_time
-                trial_rewards_relative = trial_rewards_abs - entry_time
-                trial_exits_relative = bg_exit_times[trial_idx] - entry_time
-                aligned_licks_by_trial.append(list(trial_licks_relative))
-                aligned_rewards_by_trial.append(list(trial_rewards_relative))
-                aligned_exits_by_trial.append([trial_exits_relative])
-        self.bg_behav_by_trial
+            print("Proceeding with analysis assuming aligned entry and exit data.")
+            licks_by_trial = []
+            rewards_by_trial = []
+            excess_entries_by_trial = []
+            excess_exits_by_trial = []
+            if len(bg_entry_times) == 0:
+                print("No port 2 entry events found. Cannot create raster plot.")
+            else:
+                for trial_idx, entry_time in enumerate(bg_entry_times):
+                    trial_licks_abs = bg_lick_times[(bg_lick_times > entry_time) & (bg_lick_times < bg_exit_times[trial_idx])]
+                    trial_rewards_abs = bg_reward_times[
+                        (bg_reward_times > entry_time) & (bg_reward_times < bg_exit_times[trial_idx])]
+                    trial_excess_entries_abs = bg_excessive_entry_times[
+                        (abs(bg_excessive_entry_times - entry_time) > 0.01) & (
+                                    bg_excessive_entry_times > entry_time) & (bg_excessive_entry_times < bg_exit_times[trial_idx])]
+                    trial_excess_exits_abs = bg_excessive_exit_times[
+                        (bg_excessive_exit_times > entry_time) & (bg_excessive_exit_times < bg_exit_times[trial_idx])]
+                    licks_by_trial.append(list(trial_licks_abs))
+                    rewards_by_trial.append(list(trial_rewards_abs))
+                    excess_entries_by_trial.append(list(trial_excess_entries_abs))
+                    excess_exits_by_trial.append(list(trial_excess_exits_abs))
+            self.bg_behav_by_trial['trial'] = bg_exits_df['trial']
+            self.bg_behav_by_trial['phase'] = bg_exits_df['phase']
+            self.bg_behav_by_trial['entry'] = bg_entry_times
+            self.bg_behav_by_trial['exit'] = bg_exit_times
+            self.bg_behav_by_trial['licks'] = licks_by_trial
+            self.bg_behav_by_trial['rewards'] = rewards_by_trial
+            self.bg_behav_by_trial['excess_entries'] = excess_entries_by_trial
+            self.bg_behav_by_trial['excess_exits'] = excess_exits_by_trial
+            print('Dataframe bg_behav_by_trial have been prepared. ')
+
     def bg_lick_rasterplot(self):
         is_trial_start = (self.pi_events['key'] == 'trial') & (self.pi_events['value'] == 1)
         is_lick = (self.pi_events['key'] == 'lick') & (self.pi_events['value'] == 1)
@@ -210,7 +229,8 @@ class OneSession:
                 filter_left = entry_time + time_window_before
                 filter_right = min(bg_exit_times[trial_idx], entry_time + time_window_after)
                 trial_licks_abs = bg_lick_times[(bg_lick_times > filter_left) & (bg_lick_times < filter_right)]
-                trial_rewards_abs = bg_reward_times[(bg_reward_times > filter_left) & (bg_reward_times < bg_exit_times[trial_idx])]
+                trial_rewards_abs = bg_reward_times[
+                    (bg_reward_times > filter_left) & (bg_reward_times < bg_exit_times[trial_idx])]
                 trial_licks_relative = trial_licks_abs - entry_time
                 trial_rewards_relative = trial_rewards_abs - entry_time
                 trial_exits_relative = bg_exit_times[trial_idx] - entry_time
@@ -796,6 +816,7 @@ if __name__ == '__main__':
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
+    test_session.extract_bg_behav_by_trial()
     test_session.bg_lick_rasterplot()
     # test_session.extract_transient(plot_zscore=0)
     # test_session.visualize_correlation_scatter(save=0)
