@@ -180,12 +180,14 @@ class OneSession:
                 print("No port 2 entry events found. Cannot create raster plot.")
             else:
                 for trial_idx, entry_time in enumerate(bg_entry_times):
-                    trial_licks_abs = bg_lick_times[(bg_lick_times > entry_time) & (bg_lick_times < bg_exit_times[trial_idx])]
+                    trial_licks_abs = bg_lick_times[
+                        (bg_lick_times > entry_time) & (bg_lick_times < bg_exit_times[trial_idx])]
                     trial_rewards_abs = bg_reward_times[
                         (bg_reward_times > entry_time) & (bg_reward_times < bg_exit_times[trial_idx])]
                     trial_excess_entries_abs = bg_excessive_entry_times[
                         (abs(bg_excessive_entry_times - entry_time) > 0.01) & (
-                                    bg_excessive_entry_times > entry_time) & (bg_excessive_entry_times < bg_exit_times[trial_idx])]
+                                bg_excessive_entry_times > entry_time) & (
+                                    bg_excessive_entry_times < bg_exit_times[trial_idx])]
                     trial_excess_exits_abs = bg_excessive_exit_times[
                         (bg_excessive_exit_times > entry_time) & (bg_excessive_exit_times < bg_exit_times[trial_idx])]
                     licks_by_trial.append(list(trial_licks_abs))
@@ -201,6 +203,144 @@ class OneSession:
             self.bg_behav_by_trial['excess_entries'] = excess_entries_by_trial
             self.bg_behav_by_trial['excess_exits'] = excess_exits_by_trial
             print('Dataframe bg_behav_by_trial have been prepared. ')
+
+    def plot_reward_aligned_lick_histograms(self,
+                                            phases_to_analyze=['0.4', '0.8'],
+                                            reward_indices_to_align=[0,1,2,3],
+                                            window_r123=(-1.0, 1.0),
+                                            window_r4=(-1.0, 0.2),
+                                            target_bin_width=0.1):
+
+
+        if not hasattr(self, 'bg_behav_by_trial') or self.bg_behav_by_trial.empty:
+            print("DataFrame 'bg_behav_by_trial' is not available or is empty.")
+            return
+        if not hasattr(self, 'block_palette'):
+            print("Warning: self.block_palette not found. Using default colors.")
+            cmap = plt.cm.get_cmap('viridis', len(phases_to_analyze) if len(phases_to_analyze) > 0 else 1)
+            self.block_palette = [cmap(i) for i in range(len(phases_to_analyze))]
+
+        num_phases = len(phases_to_analyze)
+        num_reward_alignments = len(reward_indices_to_align)
+
+        if num_phases == 0 or num_reward_alignments == 0:
+            print("No phases or reward alignment points specified.")
+            return
+
+        fig, axes = plt.subplots(num_phases, num_reward_alignments,
+                                 figsize=(2 * num_reward_alignments, 3 * num_phases),
+                                 sharex=False, sharey=True, squeeze=False)
+
+        def get_reward_label(idx):
+            if idx == 0: return "1st"
+            if idx == 1: return "2nd"
+            if idx == 2: return "3rd"
+            return f"{idx + 1}th"
+
+        for i, current_phase in enumerate(phases_to_analyze):
+            phase_df = self.bg_behav_by_trial[self.bg_behav_by_trial['phase'] == current_phase]
+            bar_color_for_phase = self.block_palette[i % len(self.block_palette)]
+
+            if phase_df.empty:
+                for k_col, reward_idx_col_loop in enumerate(reward_indices_to_align):
+                    ax = axes[i, k_col]
+                    temp_t_before, temp_t_after = window_r123 if reward_idx_col_loop < 3 else window_r4
+                    reward_label_str_col = get_reward_label(reward_idx_col_loop)
+                    ax.text(0.5, 0.5, f"P{current_phase}|{reward_label_str_col}\nNo Data", fontsize=7)
+                    ax.axvline(0, color='gray', linestyle='--', linewidth=1, label=f'{reward_label_str_col} Reward')
+                    ax.set_xlim(temp_t_before, temp_t_after)
+                    ax.legend(fontsize='x-small')
+                continue
+
+            for k, reward_idx_to_align in enumerate(reward_indices_to_align):
+                ax = axes[i, k]
+                current_reward_label = get_reward_label(reward_idx_to_align)
+
+                current_t_before, current_t_after = window_r123
+                if reward_idx_to_align == 3:  # 4th reward (0-indexed)
+                    current_t_before, current_t_after = window_r4
+
+                current_hist_range = (current_t_before, current_t_after)  # Still useful for np.histogram if needed
+
+                # --- Calculate bin edges based on target_bin_width ---
+                current_range_width = current_t_after - current_t_before
+                if current_range_width <= 0 or target_bin_width <= 0:  # Safety checks
+                    num_actual_bins = 1  # Fallback to a single bin
+                    current_bin_edges = np.array([current_t_before, current_t_after])
+                else:
+                    # Calculate the number of bins needed to cover the range with the target width
+                    num_actual_bins = int(np.ceil(current_range_width / target_bin_width))
+                    # Use np.linspace to create precise bin edges. num_actual_bins + 1 edges for num_actual_bins bins.
+                    current_bin_edges = np.linspace(current_t_before, current_t_after, num_actual_bins + 1)
+
+                # --- End of bin edges calculation ---
+
+                ax.axvline(0, color='red', linestyle='--', linewidth=1.5, label=f'{current_reward_label} Reward')
+                ax.grid(axis='y', linestyle='--', alpha=0.7)
+                ax.set_xlim(current_t_before, current_t_after)
+
+                all_relative_licks_for_subplot = []
+                trials_contributing_after_filter = 0
+
+                # --- Data preparation and filtering ---
+                for _, trial_data in phase_df.iterrows():
+                    reward_times_in_trial = trial_data['rewards']
+                    lick_times_in_trial = trial_data['licks']
+                    if not (isinstance(reward_times_in_trial, list) and len(
+                            reward_times_in_trial) > reward_idx_to_align):
+                        continue
+                    alignment_reward_time_abs = reward_times_in_trial[reward_idx_to_align]
+                    data_collection_window_start = alignment_reward_time_abs + current_t_before
+                    data_collection_window_end = alignment_reward_time_abs + current_t_after
+                    stayed_in_port_continuously = True  # Assuming this logic is complete from previous steps
+                    primary_trial_entry = trial_data['entry']
+                    primary_trial_exit = trial_data['exit']
+                    if not (
+                            primary_trial_entry <= data_collection_window_start and primary_trial_exit >= data_collection_window_end):
+                        stayed_in_port_continuously = False
+                    if stayed_in_port_continuously:
+                        trial_excess_exits = trial_data.get('excess_exits', [])
+                        if isinstance(trial_excess_exits, list):
+                            for t_excess_exit in trial_excess_exits:
+                                if data_collection_window_start < t_excess_exit < data_collection_window_end:
+                                    stayed_in_port_continuously = False
+                                    break
+                    if not stayed_in_port_continuously:
+                        continue
+                    trials_contributing_after_filter += 1
+                    if isinstance(lick_times_in_trial, list) and len(lick_times_in_trial) > 0:
+                        for lick_time_abs in lick_times_in_trial:
+                            relative_lick_time = lick_time_abs - alignment_reward_time_abs
+                            # Licks must be within the precise histogram range for binning
+                            if current_bin_edges[0] <= relative_lick_time <= current_bin_edges[-1]:
+                                all_relative_licks_for_subplot.append(relative_lick_time)
+                # --- End of data preparation ---
+                text_main = f"Phase {current_phase} | {current_reward_label} Reward"
+                if trials_contributing_after_filter == 0:
+                    print(f"Phase {current_phase}: No trials with at least {current_reward_label} reward.")
+                    ax.text(0.5, 0.5, f"{text_main}\nNo such rewards in trials", fontsize=9)
+                elif not all_relative_licks_for_subplot:
+                    print(
+                        f"Phase {current_phase}, {current_reward_label} Reward: No licks in window ({trials_contributing_after_filter} trials had this reward).")
+                    ax.text(0.5, 0.5, f"{text_main}\n({trials_contributing_after_filter} trials)\nNo licks in window", fontsize=9)
+                else:
+                    raw_counts, _ = np.histogram(all_relative_licks_for_subplot, bins=current_bin_edges)
+                    weights = np.full(len(all_relative_licks_for_subplot), (1 / trials_contributing_after_filter) / target_bin_width)  # Percentage
+
+                    ax.hist(all_relative_licks_for_subplot, bins=current_bin_edges,  # Use edges
+                            weights=weights, color=bar_color_for_phase,
+                            edgecolor='grey', alpha=0.75)
+
+
+        for reward_idx in reward_indices_to_align:
+            reward_label_str = get_reward_label(reward_idx)
+            axes[0, reward_idx].set_title(f"{reward_label_str} Reward")
+        fig.supxlabel("Time from Reward (sec)")
+        fig.supylabel('Lick Freq. (licks/sec/trial)')
+        fig.suptitle(f"{self.animal}: {self.signal_dir[-21:-7]} ")
+        fig.tight_layout()
+        fig.show()
+        print('Figure generated')
 
     def bg_lick_rasterplot(self):
         is_trial_start = (self.pi_events['key'] == 'trial') & (self.pi_events['value'] == 1)
@@ -811,12 +951,13 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ043', 23, include_branch='both', port_swap=0)
+    test_session = OneSession('RK003', 24, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
     test_session.extract_bg_behav_by_trial()
+    test_session.plot_reward_aligned_lick_histograms()
     test_session.bg_lick_rasterplot()
     # test_session.extract_transient(plot_zscore=0)
     # test_session.visualize_correlation_scatter(save=0)
