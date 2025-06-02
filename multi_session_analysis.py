@@ -411,12 +411,12 @@ def visualize_DA_vs_NRI(ani_summary):
 
 
 def multi_session_analysis(animal_str, session_list, include_branch='both', port_swap=0):
-    # lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
-    # animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
-    # raw_dir = os.path.join(animal_dir, 'raw_data')
-    lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
-    animal_dir = os.path.join(lab_dir, animal_str)
+    lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
+    animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
     raw_dir = os.path.join(animal_dir, 'raw_data')
+    # lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
+    # animal_dir = os.path.join(lab_dir, animal_str)
+    # raw_dir = os.path.join(animal_dir, 'raw_data')
     FP_file_list = func.list_files_by_time(raw_dir, file_type='FP', print_names=0)
     behav_file_list = func.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
     TTL_file_list = func.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
@@ -454,6 +454,9 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
                                    NRI_amp_contra=df2, IRI_amp_ipsi=df3, IRI_amp_contra=df4, DA_features=df5)
     else:
         print("Error: the numbers of different data files should be equal!!")
+    lick_mod_low = [None] * len(behav_file_list)
+    lick_mod_high = [None] * len(behav_file_list)
+    DA_block_transition_list = [None] * len(behav_file_list)
     for i in session_list:
         try:
             ani_summary.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch,
@@ -461,13 +464,17 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
             # ani_summary.session_obj_list[i].examine_raw(save=1)
             ani_summary.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
             ani_summary.session_obj_list[i].process_behavior_data(save=0)
+            DA_block_transition_list[i] = ani_summary.session_obj_list[i].bg_port_in_block_reversal(plot_single_traes=0,
+                                                                                                    plot_average=0)
+            # ani_summary.session_obj_list[i].extract_bg_behav_by_trial()
+            # lick_rates, (lick_mod_low[i], lick_mod_high[i]) = ani_summary.session_obj_list[i].calculate_lick_rates_around_bg_reward()
             # ani_summary.session_obj_list[i].plot_bg_heatmaps(save=1)
             # ani_summary.session_obj_list[i].plot_heatmaps(save=1)
             # ani_summary.session_obj_list[i].actual_leave_vs_adjusted_optimal(save=0)
             # ani_summary.session_obj_list[i].extract_transient(plot_zscore=0)
             # ani_summary.session_obj_list[i].visualize_correlation_scatter(save=0)
             # ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=0)
-            ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
+            # ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
             # ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
             #                                                          block_split=True,
             #                                                          plot_linecharts=0,
@@ -483,8 +490,19 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
     #                                     save_path=None)
     # df_DA_NRI_rewardhistory = visualize_NRI_reward_history_vs_DA(ani_summary)
     # visualize_NRI_IRI_vs_DA(ani_summary, run_statistics=1,plot_heatmaps=0, plot_scatters=0)
-    visualize_DA_vs_NRI(ani_summary)
+    # visualize_DA_vs_NRI(ani_summary)
     # stats_df = stats_analysis_intervals_vs_DA(ani_summary)
+
+    # # plot lick modulation progression
+    # lick_mod_low = [item for item in lick_mod_low if item is not None]
+    # lick_mod_high = [item for item in lick_mod_high if item is not None]
+    # fig, ax = plt.subplots(figsize=(5, 2))
+    # palette = sns.color_palette('Set2')
+    # ax.plot(lick_mod_low, marker='o', color=palette[0], label='Low context reward rate')
+    # ax.plot(lick_mod_high, marker='o', color=palette[1], label='High context reward rate')
+    # ax.set_xlabel('Session number')
+    # ax.set_title(f'{animal_str}: Anticipatory Lick Modulation')
+    # fig.show()
     return ani_summary
 
 
@@ -492,17 +510,17 @@ if __name__ == '__main__':
     # multi
     # DAresponse = np.zeros(90)
 
-    session_list = [0, 2, 4, 6, 8, 10, 13, 15, 17, 20, 21, 22, 23, 24]
-    summary_RK1 = multi_session_analysis('RK001', session_list, include_branch='both', port_swap=0)
-
-    session_list = [1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 25]
-    summary_RK3 = multi_session_analysis('RK003', session_list, include_branch='both', port_swap=0)
-
-    session_list = [3, 5, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17]
-    summary_RK5 = multi_session_analysis('RK005', session_list, include_branch='both', port_swap=0)
-
-    session_list = [0, 1, 2, 4, 11, 12, 13, 14, 15, 17, 18, 20, 22, 23, 24]
-    summary_RK6 = multi_session_analysis('RK006', session_list, include_branch='both', port_swap=1)
+    # session_list = [0, 2, 4, 6, 8, 10, 13, 15, 17, 20, 21, 22, 23, 24]
+    # summary_RK1 = multi_session_analysis('RK001', session_list, include_branch='both', port_swap=0)
+    #
+    # session_list = [1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 25]
+    # summary_RK3 = multi_session_analysis('RK003', session_list, include_branch='both', port_swap=0)
+    #
+    # session_list = [3, 5, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17]
+    # summary_RK5 = multi_session_analysis('RK005', session_list, include_branch='both', port_swap=0)
+    #
+    # session_list = [0, 1, 2, 4, 11, 12, 13, 14, 15, 17, 18, 20, 22, 23, 24]
+    # summary_RK6 = multi_session_analysis('RK006', session_list, include_branch='both', port_swap=1)
 
     session_list = [1, 2, 3, 5, 7, 9, 11, 12, 14, 15, 19, 22, 23, 24, 25]
     summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')

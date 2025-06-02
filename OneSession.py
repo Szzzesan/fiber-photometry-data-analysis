@@ -180,12 +180,14 @@ class OneSession:
                 print("No port 2 entry events found. Cannot create raster plot.")
             else:
                 for trial_idx, entry_time in enumerate(bg_entry_times):
-                    trial_licks_abs = bg_lick_times[(bg_lick_times > entry_time) & (bg_lick_times < bg_exit_times[trial_idx])]
+                    trial_licks_abs = bg_lick_times[
+                        (bg_lick_times > entry_time) & (bg_lick_times < bg_exit_times[trial_idx])]
                     trial_rewards_abs = bg_reward_times[
                         (bg_reward_times > entry_time) & (bg_reward_times < bg_exit_times[trial_idx])]
                     trial_excess_entries_abs = bg_excessive_entry_times[
                         (abs(bg_excessive_entry_times - entry_time) > 0.01) & (
-                                    bg_excessive_entry_times > entry_time) & (bg_excessive_entry_times < bg_exit_times[trial_idx])]
+                                bg_excessive_entry_times > entry_time) & (
+                                bg_excessive_entry_times < bg_exit_times[trial_idx])]
                     trial_excess_exits_abs = bg_excessive_exit_times[
                         (bg_excessive_exit_times > entry_time) & (bg_excessive_exit_times < bg_exit_times[trial_idx])]
                     licks_by_trial.append(list(trial_licks_abs))
@@ -256,7 +258,328 @@ class OneSession:
             ax.set_yticks([1, 10, 20, 30, 40, 50])
             ax.invert_yaxis()
             fig.show()
-            print('temporary pause here')
+
+    def plot_reward_aligned_lick_histograms(self,
+                                            phases_to_analyze=['0.4', '0.8'],
+                                            reward_indices_to_align=[0, 1, 2, 3],
+                                            window_r123=(-0.9, 0.3),
+                                            window_r4=(-1.0, 0.2),
+                                            target_bin_width=0.1):
+
+        if not hasattr(self, 'bg_behav_by_trial') or self.bg_behav_by_trial.empty:
+            print("DataFrame 'bg_behav_by_trial' is not available or is empty.")
+            return
+        if not hasattr(self, 'block_palette'):
+            print("Warning: self.block_palette not found. Using default colors.")
+            cmap = plt.cm.get_cmap('viridis', len(phases_to_analyze) if len(phases_to_analyze) > 0 else 1)
+            self.block_palette = [cmap(i) for i in range(len(phases_to_analyze))]
+
+        num_phases = len(phases_to_analyze)
+        num_reward_alignments = len(reward_indices_to_align)
+
+        if num_phases == 0 or num_reward_alignments == 0:
+            print("No phases or reward alignment points specified.")
+            return
+
+        fig, axes = plt.subplots(num_phases, num_reward_alignments,
+                                 figsize=(2 * num_reward_alignments, 3 * num_phases),
+                                 sharex=False, sharey=True, squeeze=False)
+
+        def get_reward_label(idx):
+            if idx == 0: return "1st"
+            if idx == 1: return "2nd"
+            if idx == 2: return "3rd"
+            return f"{idx + 1}th"
+
+        for i, current_phase in enumerate(phases_to_analyze):
+            phase_df = self.bg_behav_by_trial[self.bg_behav_by_trial['phase'] == current_phase]
+            bar_color_for_phase = self.block_palette[i % len(self.block_palette)]
+
+            if phase_df.empty:
+                for k_col, reward_idx_col_loop in enumerate(reward_indices_to_align):
+                    ax = axes[i, k_col]
+                    temp_t_before, temp_t_after = window_r123 if reward_idx_col_loop < 3 else window_r4
+                    reward_label_str_col = get_reward_label(reward_idx_col_loop)
+                    ax.text(0.5, 0.5, f"P{current_phase}|{reward_label_str_col}\nNo Data", fontsize=7)
+                    ax.axvline(0, color='gray', linestyle='--', linewidth=1, label=f'{reward_label_str_col} Reward')
+                    ax.set_xlim(temp_t_before, temp_t_after)
+                    ax.legend(fontsize='x-small')
+                continue
+
+            for k, reward_idx_to_align in enumerate(reward_indices_to_align):
+                ax = axes[i, k]
+                current_reward_label = get_reward_label(reward_idx_to_align)
+
+                current_t_before, current_t_after = window_r123
+                if reward_idx_to_align == 3:  # 4th reward (0-indexed)
+                    current_t_before, current_t_after = window_r4
+
+                current_hist_range = (current_t_before, current_t_after)  # Still useful for np.histogram if needed
+
+                # --- Calculate bin edges based on target_bin_width ---
+                current_range_width = current_t_after - current_t_before
+                if current_range_width <= 0 or target_bin_width <= 0:  # Safety checks
+                    num_actual_bins = 1  # Fallback to a single bin
+                    current_bin_edges = np.array([current_t_before, current_t_after])
+                else:
+                    # Calculate the number of bins needed to cover the range with the target width
+                    num_actual_bins = int(np.ceil(current_range_width / target_bin_width))
+                    # Use np.linspace to create precise bin edges. num_actual_bins + 1 edges for num_actual_bins bins.
+                    current_bin_edges = np.linspace(current_t_before, current_t_after, num_actual_bins + 1)
+
+                # --- End of bin edges calculation ---
+
+                ax.axvline(0, color='red', linestyle='--', linewidth=1.5, label=f'{current_reward_label} Reward')
+                ax.grid(axis='y', linestyle='--', alpha=0.7)
+                ax.set_xlim(current_t_before, current_t_after)
+
+                all_relative_licks_for_subplot = []
+                trials_contributing_after_filter = 0
+
+                # --- Data preparation and filtering ---
+                for _, trial_data in phase_df.iterrows():
+                    reward_times_in_trial = trial_data['rewards']
+                    lick_times_in_trial = trial_data['licks']
+                    if not (isinstance(reward_times_in_trial, list) and len(
+                            reward_times_in_trial) > reward_idx_to_align):
+                        continue
+                    alignment_reward_time_abs = reward_times_in_trial[reward_idx_to_align]
+                    data_collection_window_start = alignment_reward_time_abs + current_t_before
+                    data_collection_window_end = alignment_reward_time_abs + current_t_after
+                    stayed_in_port_continuously = True  # Assuming this logic is complete from previous steps
+                    primary_trial_entry = trial_data['entry']
+                    primary_trial_exit = trial_data['exit']
+                    if not (
+                            primary_trial_entry <= data_collection_window_start and primary_trial_exit >= data_collection_window_end):
+                        stayed_in_port_continuously = False
+                    if stayed_in_port_continuously:
+                        trial_excess_exits = trial_data.get('excess_exits', [])
+                        if isinstance(trial_excess_exits, list):
+                            for t_excess_exit in trial_excess_exits:
+                                if data_collection_window_start < t_excess_exit < data_collection_window_end:
+                                    stayed_in_port_continuously = False
+                                    break
+                    if not stayed_in_port_continuously:
+                        continue
+                    trials_contributing_after_filter += 1
+                    if isinstance(lick_times_in_trial, list) and len(lick_times_in_trial) > 0:
+                        for lick_time_abs in lick_times_in_trial:
+                            relative_lick_time = lick_time_abs - alignment_reward_time_abs
+                            # Licks must be within the precise histogram range for binning
+                            if current_bin_edges[0] <= relative_lick_time <= current_bin_edges[-1]:
+                                all_relative_licks_for_subplot.append(relative_lick_time)
+                # --- End of data preparation ---
+                text_main = f"Phase {current_phase} | {current_reward_label} Reward"
+                if trials_contributing_after_filter == 0:
+                    print(f"Phase {current_phase}: No trials with at least {current_reward_label} reward.")
+                    ax.text(0.5, 0.5, f"{text_main}\nNo such rewards in trials", fontsize=9)
+                elif not all_relative_licks_for_subplot:
+                    print(
+                        f"Phase {current_phase}, {current_reward_label} Reward: No licks in window ({trials_contributing_after_filter} trials had this reward).")
+                    ax.text(0.5, 0.5, f"{text_main}\n({trials_contributing_after_filter} trials)\nNo licks in window",
+                            fontsize=9)
+                else:
+                    raw_counts, _ = np.histogram(all_relative_licks_for_subplot, bins=current_bin_edges)
+                    weights = np.full(len(all_relative_licks_for_subplot),
+                                      (1 / trials_contributing_after_filter) / target_bin_width)  # Percentage
+
+                    ax.hist(all_relative_licks_for_subplot, bins=current_bin_edges,  # Use edges
+                            weights=weights, color=bar_color_for_phase,
+                            edgecolor='grey', alpha=0.75)
+
+        for reward_idx in reward_indices_to_align:
+            reward_label_str = get_reward_label(reward_idx)
+            axes[0, reward_idx].set_title(f"{reward_label_str} Reward")
+        fig.supxlabel("Time from Reward (sec)")
+        fig.supylabel('Lick Freq. (licks/sec/trial)')
+        fig.suptitle(f"{self.animal}: {self.signal_dir[-21:-7]} ")
+        fig.tight_layout()
+        fig.show()
+
+    def calculate_lick_rates_around_bg_reward(self, reward_idx_to_align=3, plot_comparison=0):
+        """
+        Calculates average lick frequencies (licks/sec/trial) for specific windows
+        around the 2nd reward, for phases '0.4' and '0.8'.
+        Filters trials based on continuous port stay during a defined overall window.
+        """
+        if not hasattr(self, 'bg_behav_by_trial') or self.bg_behav_by_trial.empty:
+            print("DataFrame 'bg_behav_by_trial' is not available or is empty.")
+            return None
+
+        calculated_rates = {}
+        reward_label_str_list = ['1st Reward', '2nd Reward', '3rd Reward', '4th Reward']
+        reward_label = reward_label_str_list[reward_idx_to_align]
+
+        # Define phase-specific configurations
+        # Windows are [start, end) relative to the 2nd reward time
+        phase_configs = {
+            '0.4': {
+                'overall_port_stay_window': (-1.4, 0.3),
+                'analysis_windows': {
+                    'baseline': (-1.4, -1.1),
+                    'anticipation': (-0.3, 0.0),
+                    'consumption': (0.0, 0.3)
+                }
+            },
+            '0.8': {
+                'overall_port_stay_window': (-0.8, 0.3),
+                'analysis_windows': {
+                    'baseline': (-0.8, -0.5),
+                    'anticipation': (-0.3, 0.0),
+                    'consumption': (0.0, 0.3)
+                }
+            }
+        }
+
+        for phase, config in phase_configs.items():
+            phase_df = self.bg_behav_by_trial[
+                self.bg_behav_by_trial['phase'] == str(phase)]  # Ensure phase is string for lookup
+
+            if phase_df.empty:
+                print(f"No data found for phase '{phase}'.")
+                calculated_rates[phase] = {f"{name}_freq_hz": 0.0 for name in config['analysis_windows']}
+                calculated_rates[phase]['num_valid_trials'] = 0
+                continue
+
+            valid_trials_for_phase_count = 0
+            # Initialize total licks for each analysis window for this phase
+            total_licks_in_analysis_windows = {key: 0 for key in config['analysis_windows']}
+
+            for _, trial_data in phase_df.iterrows():
+                reward_times_in_trial = trial_data['rewards']
+
+                # Check 1: Does the trial have at least the 2nd reward?
+                if not (isinstance(reward_times_in_trial, list) and len(reward_times_in_trial) > reward_idx_to_align):
+                    continue
+
+                alignment_reward_time_abs = reward_times_in_trial[reward_idx_to_align]
+
+                # Define the overall window for port stay check, in absolute time
+                port_stay_win_start_rel, port_stay_win_end_rel = config['overall_port_stay_window']
+                abs_port_stay_window_start = alignment_reward_time_abs + port_stay_win_start_rel
+                abs_port_stay_window_end = alignment_reward_time_abs + port_stay_win_end_rel
+
+                # Check 2: Continuous Port Occupancy Filter
+                stayed_in_port_continuously = True
+                primary_trial_entry = trial_data['entry']
+                primary_trial_exit = trial_data['exit']
+
+                if not (primary_trial_entry <= abs_port_stay_window_start and \
+                        primary_trial_exit >= abs_port_stay_window_end):
+                    stayed_in_port_continuously = False
+
+                if stayed_in_port_continuously:
+                    trial_excess_exits = trial_data.get('excess_exits', [])  # Use .get for safety
+                    if isinstance(trial_excess_exits, list):
+                        for t_excess_exit in trial_excess_exits:
+                            # If an excess exit occurs strictly WITHIN the port stay window boundaries
+                            if abs_port_stay_window_start < t_excess_exit < abs_port_stay_window_end:
+                                stayed_in_port_continuously = False
+                                break
+
+                if not stayed_in_port_continuously:
+                    continue  # Skip this trial due to port exit during the overall validity window
+
+                # If we reach here, trial is valid (has 2nd reward & passed port stay filter)
+                valid_trials_for_phase_count += 1
+
+                lick_times_in_trial = trial_data.get('licks', [])  # Use .get for safety
+                if isinstance(lick_times_in_trial, list) and len(lick_times_in_trial) > 0:
+                    for lick_time_abs in lick_times_in_trial:
+                        relative_lick_time = lick_time_abs - alignment_reward_time_abs
+
+                        for window_name, (win_start_rel, win_end_rel) in config['analysis_windows'].items():
+                            # Check if lick falls into the analysis window [start, end)
+                            if win_start_rel <= relative_lick_time < win_end_rel:
+                                total_licks_in_analysis_windows[window_name] += 1
+
+            # Calculate average frequencies for the current phase
+            phase_results_dict = {}
+            if valid_trials_for_phase_count > 0:
+                for window_name, total_licks in total_licks_in_analysis_windows.items():
+                    win_start_rel, win_end_rel = config['analysis_windows'][window_name]
+                    window_duration_sec = win_end_rel - win_start_rel
+
+                    if window_duration_sec > 0:  # Should always be true with defined windows
+                        avg_freq_hz = total_licks / (valid_trials_for_phase_count * window_duration_sec)
+                    else:
+                        avg_freq_hz = 0.0
+                    phase_results_dict[f"{window_name}_freq_hz"] = avg_freq_hz
+            else:  # No valid trials found for this phase
+                for window_name in config['analysis_windows'].keys():
+                    phase_results_dict[f"{window_name}_freq_hz"] = 0.0
+
+            phase_results_dict['num_valid_trials'] = valid_trials_for_phase_count
+            calculated_rates[phase] = phase_results_dict
+
+        if plot_comparison:
+            # Define the order of periods for the x-axis
+            period_labels = ['baseline\n(middle 0.3 sec)', 'anticipation\n((-0.3, 0) sec)',
+                             'consumption\n((0, 0.3) sec)']
+            periods = ['baseline', 'anticipation', 'consumption']
+            x_coords = np.arange(len(periods))  # Numerical positions for x-axis
+
+            fig, ax = plt.subplots(figsize=(4, 6))
+
+            # Determine which phases are in the data, or use a fixed list
+            phases_to_plot_from_data = sorted(calculated_rates.keys())
+
+            # Use a consistent order and only plot requested phases if self.block_palette is indexed
+            # For this example, we'll use the phases available in calculated_rates and map to palette
+            palette_indices = {'0.4': 0, '0.8': 1}  # Assuming these are the main phases of interest
+
+            for phase_key in phases_to_plot_from_data:
+                if phase_key not in calculated_rates or phase_key not in palette_indices:
+                    print(f"Skipping phase {phase_key}: not in data or no defined palette index.")
+                    continue
+
+                phase_data = calculated_rates[phase_key]
+                rates_for_phase = [
+                    phase_data.get(f"{p}_freq_hz", 0.0) for p in periods  # Use .get for safety
+                ]
+                num_trials = phase_data.get('num_valid_trials', 0)
+
+                # Get color from palette using predefined mapping
+                color_idx = palette_indices[phase_key]
+                color = self.block_palette[color_idx % len(self.block_palette)]
+
+                ax.plot(x_coords, rates_for_phase, marker='o', markersize=8, linestyle='-', linewidth=2,
+                        color=color, label=f"Phase {phase_key} (n={num_trials} trials)")
+
+            ax.set_xticks(x_coords)
+            ax.set_xticklabels(period_labels, fontsize=11)
+            ax.set_ylabel("Avg. Lick Rate (licks/sec/trial)", fontsize=12)
+            ax.set_title(f"{self.animal}: {self.signal_dir[-23:-7]}\nLick Rate Comparison around {reward_label}",
+                         fontsize=14, pad=20)
+
+            ax.legend(fontsize=10, title="Phase Information")
+            ax.grid(True, linestyle=':', alpha=0.7, axis='y')  # Light grid on y-axis
+
+            # Improve y-axis limits for better visualization
+            current_ylim_bottom, current_ylim_top = ax.get_ylim()
+            if current_ylim_top <= 1.0 and current_ylim_top > 0:  # If max Y is small
+                ax.set_ylim(0, max(1.0, current_ylim_top + 0.2))
+            elif current_ylim_top == 0:  # If all rates are zero
+                ax.set_ylim(0, 1.0)
+            else:  # Add some padding
+                ax.set_ylim(max(0, current_ylim_bottom - 0.1),
+                            current_ylim_top + (current_ylim_top - current_ylim_bottom) * 0.1)
+
+            plt.tight_layout()
+            plt.show()
+
+        epsilon = 1e-9
+        anticipatory_lick_modulation_low = (
+                                                   calculated_rates['0.4']['anticipation_freq_hz'] -
+                                                   calculated_rates['0.4']['baseline_freq_hz']) / (
+                                                   calculated_rates['0.4']['anticipation_freq_hz'] +
+                                                   calculated_rates['0.4']['baseline_freq_hz'] + epsilon)
+        anticipatory_lick_modulation_high = (
+                                                    calculated_rates['0.8']['anticipation_freq_hz'] -
+                                                    calculated_rates['0.8']['baseline_freq_hz']) / (
+                                                    calculated_rates['0.8']['anticipation_freq_hz'] +
+                                                    calculated_rates['0.8']['baseline_freq_hz'] + epsilon)
+        return calculated_rates, (anticipatory_lick_modulation_low, anticipatory_lick_modulation_high)
 
     def plot_bg_heatmaps(self, save=0):
         cbarmin_l = int(np.nanpercentile(self.dFF0['green_left'].values, 0.1) * 100)
@@ -574,13 +897,20 @@ class OneSession:
         plt.legend()
         plt.show()
 
-    def bg_port_in_block_reversal(self):
+    def bg_port_in_block_reversal(self, plot_single_traes=0, plot_average=0):
         df_intervals_bg = func.extract_intervals_bg_inport(self.pi_events)
 
         col_name_obj = self.dFF0.columns[1:]
+
+        # This dictionary will store all structured traces for the current object, organized by branch
+        DA_in_block_transition = {}
+
         for branch in col_name_obj:
-            # Dictionaries to store outputs
+            # Dictionaries to store outputs for current branch (for existing plots and processing)
             transition_dfs, time_series_dfs, trial_info_dfs, reward_dfs = {}, {}, {}, {}
+
+            # This dictionary will store structured traces for the current branch
+            current_branch_structured_traces = {}
 
             # Unique block sequences
             unique_blocks = df_intervals_bg['block_sequence'].unique()
@@ -588,121 +918,250 @@ class OneSession:
             # Reward columns
             reward_columns = ['reward_1', 'reward_2', 'reward_3', 'reward_4']
 
-            # Process the first four rows of Block 1
-            first_four_block1 = df_intervals_bg[df_intervals_bg['block_sequence'] == unique_blocks[0]].iloc[:4]
-            time_series_block1, trial_info_block1 = func.construct_matrix_for_average_traces(
-                self.zscore, branch,
-                first_four_block1['entry'].to_numpy(),
-                first_four_block1['exit'].to_numpy(),
-                first_four_block1['trial'].to_numpy(),
-                first_four_block1['block'].to_numpy()
-            )
-            reward_block1 = first_four_block1[reward_columns].subtract(first_four_block1['entry'], axis=0)
+            # Process the first four rows of Block 1 (existing code)
+            if len(unique_blocks) > 0:
+                first_four_block1 = df_intervals_bg[df_intervals_bg['block_sequence'] == unique_blocks[0]].iloc[:4]
+                if not first_four_block1.empty:
+                    time_series_block1, trial_info_block1 = func.construct_matrix_for_average_traces(
+                        self.zscore, branch,
+                        first_four_block1['entry'].to_numpy(),
+                        first_four_block1['exit'].to_numpy(),
+                        first_four_block1['trial'].to_numpy(),
+                        first_four_block1['block'].to_numpy()
+                    )
+                    reward_block1 = first_four_block1[reward_columns].subtract(first_four_block1['entry'], axis=0)
+
+                    # Optional: Store initial block data if needed for averaging
+                    # You can define a specific key and structure for this if required
+                    # For example:
+                    # initial_block_key = f"initial_block_{str(unique_blocks[0])}_first_{len(time_series_block1)}_trials"
+                    # trial_data = {k_idx: time_series_block1.iloc[k_idx].copy() for k_idx in range(len(time_series_block1))}
+                    # current_branch_structured_traces[initial_block_key] = trial_data
+                else:
+                    print(
+                        f"Warning for object {self.animal}, branch {branch}: No data for the first block {unique_blocks[0]}. Skipping first_four_block1 processing.")
+            else:
+                print(
+                    f"Warning for object {self.animal}, branch {branch}: No unique blocks found. Skipping processing for this branch.")
+                DA_in_block_transition[branch] = current_branch_structured_traces  # Store empty if no blocks
+                continue  # Skip to the next branch
 
             # Iterate over block transitions
             for i in range(1, len(unique_blocks)):
                 prev_block, current_block = unique_blocks[i - 1], unique_blocks[i]
-                transition_df, time_series_df, trial_info_df, reward_df = func.process_block_transition(
+
+                # It's assumed func.process_block_transition returns time_series_df
+                # where rows are the trials: -2, -1, 0 (switch), +1, +2, +3 relative to switch
+                _transition_df, _time_series_df, _trial_info_df, _reward_df = func.process_block_transition(
                     prev_block, current_block, df_intervals_bg, reward_columns, self.zscore, branch
                 )
+
+                # Store for existing plotting logic
                 key = f"transition_block_{prev_block}_to_{current_block}"
-                transition_dfs[key] = transition_df
-                time_series_dfs[key] = time_series_df
-                trial_info_dfs[key] = trial_info_df
-                reward_dfs[key] = reward_df
+                transition_dfs[key] = _transition_df
+                time_series_dfs[key] = _time_series_df
+                trial_info_dfs[key] = _trial_info_df
+                reward_dfs[key] = _reward_df
 
-            # Print the first four rows of Group 1
-            print("First four rows of Group 1:")
-            print(first_four_block1)
+                # --- New logic for structuring data for saving ---
+                # Define the relative trial numbers corresponding to the rows of _time_series_df
+                # Based on your plotting legends: ['trial -2', 'trial -1', 'trial 0', 'trial 1', 'trial 2', 'trial 3']
+                relative_trial_labels = [-2, -1, 0, 1, 2, 3]
 
-            # Print each transition DataFrame
-            for key, transition_df in transition_dfs.items():
-                print(f"\n{key}:")
-                print(transition_df)
+                structured_transition_key = f"from_{str(prev_block)}_to_{str(current_block)}"
+                current_branch_structured_traces[structured_transition_key] = {}
 
-            time_series_list = list(time_series_dfs.values())
-            trial_info_list = list(trial_info_dfs.values())
-            reward_list = list(reward_dfs.values())
+                if len(_time_series_df) == len(relative_trial_labels):
+                    for trial_idx, rel_label in enumerate(relative_trial_labels):
+                        # _time_series_df.iloc[trial_idx] is the pandas Series for this trial's trace
+                        current_branch_structured_traces[structured_transition_key][rel_label] = _time_series_df.iloc[
+                            trial_idx].copy()
+                else:
+                    print(
+                        f"Warning for object {self.animal}, branch {branch}, transition {structured_transition_key}: Expected {len(relative_trial_labels)} trials, but found {len(_time_series_df)}. Data for this transition will be incomplete in the structured output.")
+                    # Store what's available, labeling by relative trial index if possible,
+                    # or you might decide to skip this transition for this branch's structured data.
+                    # For now, it will result in a partially filled or empty dict for this transition's trials.
+                    # You could fill with NaNs or handle as per your error strategy. For example, to store available ones:
+                    # for trial_idx in range(len(_time_series_df)):
+                    #    if trial_idx < len(relative_trial_labels): # Ensure we don't go out of bounds for labels
+                    #        rel_label = relative_trial_labels[trial_idx] # This might misalign if not careful, assuming first N trials
+                    #        current_branch_structured_traces[structured_transition_key][rel_label] = _time_series_df.iloc[trial_idx].copy()
 
-            # Determine the max number of trials (columns) dynamically
-            num_cols = max(len(df) for df in time_series_list)
-            num_rows = len(transition_dfs)
+            # Store the structured traces for this branch into the main dictionary for the object
+            DA_in_block_transition[branch] = current_branch_structured_traces
 
-            # Create figure and axes
-            fig, axes = plt.subplots(num_rows, num_cols, figsize=(50, 15), sharex=True, sharey=True)
-            plt.subplots_adjust(wspace=0.2, hspace=0.3)
-            fig.suptitle(f"{self.animal}:{self.signal_dir[-21:-7]}\n{branch} DA Changes upon Block Switch",
-                         fontsize=20, fontweight='bold', multialignment='center')
-            fig.supxlabel("Time since Entering Background Port (sec)", fontsize=18, fontweight='bold')
-            fig.supylabel("DA (in z-score)", fontsize=18, fontweight='bold')
+            if plot_single_traes:
+                # --- Plotting Code ---
+                if not time_series_dfs:  # Check if there are any transitions to plot
+                    print(f"No transitions to plot for branch {branch} in object {self.animal}")
+                else:
+                    # Print the first four rows of Group 1 (Block 1)
+                    if 'first_four_block1' in locals() and not first_four_block1.empty:  # ensure first_four_block1 exists and is not empty
+                        print("First four rows of Group 1:")
+                        print(first_four_block1)
+                    else:
+                        print("No data for 'first_four_block1' or it was empty.")
 
-            xticks = [0, 1.25, 2.5, 3.75, 5, 6]
-            delivered_label_added = False  # Ensure single legend entry
-            y_min, y_max = float('inf'), float('-inf')
-            for i, (df, trial_info_df, reward_df) in enumerate(zip(time_series_list, trial_info_list, reward_list)):
-                num_trials = len(df)
-                for j in range(num_trials):
-                    ax = axes[i, j]
-                    trial_num = int(trial_info_df['trial'].iloc[j])
-                    ax.set_title(f"trial {trial_num}")
-                    color = self.block_palette[0] if trial_info_df.at[j, 'phase'] == '0.4' else self.block_palette[1]
-                    ax.plot(df.iloc[j], c=color, linewidth=2.5)  # Plot time series
-                    y_min = min(y_min, df.iloc[j].min())
-                    y_max = max(y_max, df.iloc[j].max())
-                    # Plot delivered rewards (gray dashed)
-                    for x_val in reward_df.iloc[j].tolist():
-                        ax.axvline(x_val, color='b', linestyle='--', zorder=1,
-                                   label='Reward delivered' if not delivered_label_added else "")
-                        delivered_label_added = True
+                    # Print each transition DataFrame
+                    for key, df_to_print in transition_dfs.items():
+                        print(f"\n{key}:")
+                        print(df_to_print)
 
-                    if (i == 0) & (j == 0):
-                        ax.legend()
+                    time_series_list = list(time_series_dfs.values())
+                    trial_info_list = list(trial_info_dfs.values())
+                    reward_list = list(reward_dfs.values())
 
-            yticks = sorted(set([0] + [int(round(y)) for y in np.linspace(y_min, y_max, 4)]))
-            for ax in axes.flatten():
-                ax.set_xlim(0, 6)
-                ax.set_xticks(xticks)
-                ax.tick_params(axis='x', labelsize=14)
-                ax.set_yticks(yticks)
-                ax.grid(axis='x', linestyle='--', alpha=0.5)  # Add grid for better x-axis clarity
-                ax.grid(axis='y', linestyle='--', alpha=0.5)
+                    if not time_series_list:  # Check if list is empty before proceeding
+                        print(f"No time series data to plot for branch {branch}.")
+                    else:
+                        # Determine the max number of trials (columns) dynamically
+                        # num_cols = max(len(df) for df in time_series_list) # This was original
+                        # If time_series_df always has 6 rows (trials) as assumed for structured data:
+                        num_cols_plot = 6  # Max trials to plot per transition, aligns with relative_trial_labels
+                        if any(len(df) != num_cols_plot for df in time_series_list if df is not None):
+                            print(
+                                f"Warning: Not all transitions have {num_cols_plot} trials for plotting. Adjusting num_cols_plot dynamically.")
+                            # Fallback if some transitions don't have 6 trials
+                            valid_dfs = [df for df in time_series_list if df is not None and not df.empty]
+                            if valid_dfs:
+                                num_cols_plot = max(len(df) for df in valid_dfs) if valid_dfs else 1
+                            else:
+                                num_cols_plot = 1
 
-            fig.show()
+                        num_rows_plot = len(transition_dfs)
+                        if num_rows_plot == 0 or num_cols_plot == 0:
+                            print(f"Cannot create plot for branch {branch} due to zero rows or columns.")
+                        else:
+                            fig, axes = plt.subplots(num_rows_plot, num_cols_plot, figsize=(50, 15), sharex=True,
+                                                     sharey=True)
+                            if num_rows_plot == 1 and num_cols_plot == 1:  # Handle single subplot case
+                                axes = np.array([[axes]])
+                            elif num_rows_plot == 1:
+                                axes = axes.reshape(1, -1)
+                            elif num_cols_plot == 1:
+                                axes = axes.reshape(-1, 1)
 
-            selected_dfs = [time_series_list[i] for i in [0, 2, 4]]
-            mean_traces = []
-            sem_traces = []
-            for row_idx in range(6):
-                series_list = [df.iloc[row_idx].dropna() for df in selected_dfs]
-                aligned_df = pd.DataFrame(series_list)
-                mean_trace = aligned_df.mean(axis=0)
-                sem_trace = aligned_df.sem(axis=0)
-                mean_traces.append(mean_trace)
-                sem_traces.append(sem_trace)
-            mean_df = pd.DataFrame(mean_traces)
-            sem_df = pd.DataFrame(sem_traces)
-            valid_columns = ~mean_df.isna().any()
-            mean_df = mean_df.loc[:, valid_columns]
-            sem_df = sem_df.loc[:, valid_columns]
-            fig, ax = plt.subplots()
-            low_color = self.block_palette[0]
-            high_color = self.block_palette[1]
-            pre_map = sns.light_palette(high_color, n_colors=4, reverse=False)
-            post_map = sns.light_palette(low_color, n_colors=8, reverse=True)
-            colors = pre_map[2:4] + post_map[0:4]
-            legends = ['trial -2', 'trial -1', 'trial 0', 'trial 1', 'trial 2', 'trial 3']
-            for i in range(mean_df.shape[0]):
-                ax.plot(mean_df.iloc[i], color=colors[i], linewidth=1.5, label=legends[i])
-                # ax.fill_between(mean_df.columns, mean_df.iloc[i] - sem_df.iloc[i], mean_df.iloc[i] + sem_df.iloc[i],
-                #                 alpha=0.2, color=colors[i], linewidth=0, zorder=0)
-            ax.set_xlim(1, 4)
-            ax.legend()
-            ax.set_title(f"{self.animal}:{self.signal_dir[-21:-7]}\n{branch} DA Changes upon Block Switch")
-            ax.set_xlabel("Time since Entering Background Port (sec)")
-            ax.set_ylabel("DA (in z-score)")
-            fig.show()
+                            plt.subplots_adjust(wspace=0.2, hspace=0.3)
+                            fig.suptitle(f"{self.animal}:{self.signal_dir[-21:-7]}\n{branch} DA Changes upon Block Switch",
+                                         fontsize=20, fontweight='bold', multialignment='center')
+                            fig.supxlabel("Time since Entering Background Port (sec)", fontsize=18, fontweight='bold')
+                            fig.supylabel("DA (in z-score)", fontsize=18, fontweight='bold')
 
-            print('Finished plotting block reversal traces')
+                            xticks = [0, 1.25, 2.5, 3.75, 5, 6]
+                            delivered_label_added = False
+                            y_min_plot, y_max_plot = float('inf'), float('-inf')
+
+                            for i, (df_ts, df_trial_info, df_reward) in enumerate(
+                                    zip(time_series_list, trial_info_list, reward_list)):
+                                num_trials_in_transition = len(df_ts)
+                                for j in range(num_trials_in_transition):
+                                    if j >= num_cols_plot: continue  # Ensure we don't exceed allocated columns
+                                    ax = axes[i, j]
+                                    trial_num_abs = int(df_trial_info['trial'].iloc[j])  # Absolute trial number
+                                    # Title using relative trial number might be more consistent with new structure
+                                    # This assumes your trial_info_df aligns with the 6 trials: -2, -1, 0, 1, 2, 3
+                                    # If trial_info_df has a 'relative_trial_num' column, use that.
+                                    # For now, keeping original title logic using absolute trial number.
+                                    ax.set_title(f"trial {trial_num_abs}")
+
+                                    color = self.block_palette[0] if df_trial_info.at[j, 'phase'] == '0.4' else \
+                                    self.block_palette[1]
+                                    ax.plot(df_ts.iloc[j], c=color, linewidth=2.5)
+                                    if not df_ts.iloc[j].empty:
+                                        y_min_plot = min(y_min_plot, df_ts.iloc[j].min())
+                                        y_max_plot = max(y_max_plot, df_ts.iloc[j].max())
+
+                                    for x_val in df_reward.iloc[j].tolist():
+                                        if pd.notna(x_val):  # Ensure x_val is not NaN
+                                            ax.axvline(x_val, color='b', linestyle='--', zorder=1,
+                                                       label='Reward delivered' if not delivered_label_added else "")
+                                            delivered_label_added = True
+                                    if (i == 0) & (j == 0) and delivered_label_added:  # only add legend if label was set
+                                        ax.legend()
+
+                            if y_min_plot == float('inf'): y_min_plot = -1  # Default if no data
+                            if y_max_plot == float('-inf'): y_max_plot = 1  # Default if no data
+                            yticks = sorted(
+                                list(set([0] + [int(round(y)) for y in np.linspace(y_min_plot, y_max_plot, 4)])))
+
+                            for ax_row in axes:
+                                for ax in ax_row:
+                                    ax.set_xlim(0, 6)
+                                    ax.set_xticks(xticks)
+                                    ax.tick_params(axis='x', labelsize=14)
+                                    ax.set_yticks(yticks)
+                                    ax.grid(axis='x', linestyle='--', alpha=0.5)
+                                    ax.grid(axis='y', linestyle='--', alpha=0.5)
+                            fig.show()
+
+                        if plot_average:
+                            # Plotting mean traces (intra-object averaging for selected transitions)
+                            # This part uses specific transitions [0, 2, 4] from time_series_list
+                            # Ensure these indices are valid for the current time_series_list
+                            valid_indices_for_mean_plot = [idx for idx in [0, 2, 4] if idx < len(time_series_list)]
+                            if len(valid_indices_for_mean_plot) > 0:
+                                selected_dfs_for_mean = [time_series_list[k] for k in valid_indices_for_mean_plot if
+                                                         time_series_list[k] is not None and len(time_series_list[k]) == 6]
+
+                                if len(selected_dfs_for_mean) > 0:  # Ensure we have DFs to average
+                                    mean_traces, sem_traces = [], []
+                                    for row_idx in range(6):  # Assumes 6 trials (-2 to +3)
+                                        series_list_for_mean = [df.iloc[row_idx].dropna() for df in selected_dfs_for_mean if
+                                                                row_idx < len(df)]
+                                        if not series_list_for_mean: continue  # Skip if no data for this row_idx
+
+                                        aligned_df_for_mean = pd.DataFrame(series_list_for_mean)
+                                        if not aligned_df_for_mean.empty:
+                                            mean_traces.append(aligned_df_for_mean.mean(axis=0))
+                                            sem_traces.append(aligned_df_for_mean.sem(axis=0))
+
+                                    if mean_traces:  # Check if mean_traces were actually computed
+                                        mean_df = pd.DataFrame(mean_traces)
+                                        sem_df = pd.DataFrame(sem_traces)
+
+                                        # Ensure columns with all NaNs are dropped before plotting
+                                        if not mean_df.empty:
+                                            valid_columns = ~mean_df.isna().all(axis=0)  # Check if entire column is NaN
+                                            mean_df = mean_df.loc[:, valid_columns]
+                                            sem_df = sem_df.loc[:, valid_columns]
+
+                                        if not mean_df.empty:
+                                            fig_mean, ax_mean = plt.subplots()
+                                            low_color = self.block_palette[0]
+                                            high_color = self.block_palette[1]
+                                            pre_map = sns.light_palette(high_color, n_colors=4, reverse=False)
+                                            post_map = sns.light_palette(low_color, n_colors=8, reverse=True)
+                                            colors_mean = pre_map[2:4] + post_map[0:4]
+                                            legends_mean = ['trial -2', 'trial -1', 'trial 0', 'trial 1', 'trial 2',
+                                                            'trial 3']
+
+                                            for r in range(mean_df.shape[0]):
+                                                if r < len(colors_mean) and r < len(legends_mean):  # Check bounds
+                                                    ax_mean.plot(mean_df.columns, mean_df.iloc[r], color=colors_mean[r],
+                                                                 linewidth=1.5, label=legends_mean[r])
+                                                    # ax_mean.fill_between(mean_df.columns, mean_df.iloc[r] - sem_df.iloc[r], mean_df.iloc[r] + sem_df.iloc[r],
+                                                    #                 alpha=0.2, color=colors_mean[r], linewidth=0, zorder=0) # Ensure sem_df has same shape
+
+                                            ax_mean.set_xlim(1, 4)  # Adjust xlim based on your data's time range
+                                            ax_mean.legend()
+                                            ax_mean.set_title(
+                                                f"{self.animal}:{self.signal_dir[-21:-7]}\n{branch} DA Changes (Mean of Selected Transitions)")
+                                            ax_mean.set_xlabel("Time since Entering Background Port (sec)")
+                                            ax_mean.set_ylabel("DA (in z-score)")
+                                            fig_mean.show()
+                                        else:
+                                            print(f"Mean DataFrame is empty for branch {branch}, skipping mean plot.")
+                                    else:
+                                        print(f"No mean traces computed for branch {branch}, skipping mean plot.")
+                                else:
+                                    print(
+                                        f"Not enough valid DataFrames (expected 6 trials each) for mean plotting in branch {branch}.")
+                            else:
+                                print(f"Not enough transitions data for mean plotting in branch {branch}.")
+
+        print(f'Finished processing for object {self.animal}. Structured data is ready.')
+        return DA_in_block_transition
 
     def visualize_DA_vs_NRI_IRI(self, plot_histograms=0, plot_scatters=0, save=0):
         df_IRI_exp = func.extract_intervals_expreward(self.pi_events, plot_histograms=plot_histograms,
@@ -816,19 +1275,21 @@ if __name__ == '__main__':
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
-    test_session.extract_bg_behav_by_trial()
-    test_session.bg_lick_rasterplot()
+    # test_session.extract_bg_behav_by_trial()
+    # test_session.plot_reward_aligned_lick_histograms()
+    # test_session.calculate_lick_rates_around_bg_reward(reward_idx_to_align=2, plot_comparison=1)
+    # test_session.bg_lick_rasterplot()
     # test_session.extract_transient(plot_zscore=0)
     # test_session.visualize_correlation_scatter(save=0)
-    test_session.plot_heatmaps(save=1)
+    # test_session.plot_heatmaps(save=1)
     # test_session.plot_bg_heatmaps(save=0)
     # test_session.actual_leave_vs_adjusted_optimal(save=0)
-    test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
-    df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
-                                                             block_split=False,
-                                                             plot_histograms=0, plot_linecharts=1)
-    test_session.visualize_DA_vs_NRI_IRI(plot_scatters=1, plot_histograms=1)
-    # test_session.bg_port_in_block_reversal()
+    # test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
+    # df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
+    #                                                          block_split=False,
+    #                                                          plot_histograms=0, plot_linecharts=1)
+    # test_session.visualize_DA_vs_NRI_IRI(plot_scatters=1, plot_histograms=1)
+    DA_in_block_transition = test_session.bg_port_in_block_reversal(plot_single_traes=0, plot_average=0)
 
     # test_session.scatterplot_nonreward_DA_vs_NRI()
     # test_session.for_pub_compare_traces_by_NRI(branch='green_left')
