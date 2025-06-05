@@ -463,9 +463,10 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
                                                          port_swap=port_swap)
             # ani_summary.session_obj_list[i].examine_raw(save=1)
             ani_summary.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
+            ani_summary.session_obj_list[i].save_dFF0_and_zscore(format='parquet')
             ani_summary.session_obj_list[i].process_behavior_data(save=0)
-            DA_block_transition_list[i] = ani_summary.session_obj_list[i].bg_port_in_block_reversal(plot_single_traes=0,
-                                                                                                    plot_average=0)
+            # DA_block_transition_list[i] = ani_summary.session_obj_list[i].bg_port_in_block_reversal(plot_single_traes=0,
+            #                                                                                         plot_average=0)
             # ani_summary.session_obj_list[i].extract_bg_behav_by_trial()
             # lick_rates, (lick_mod_low[i], lick_mod_high[i]) = ani_summary.session_obj_list[i].calculate_lick_rates_around_bg_reward()
             # ani_summary.session_obj_list[i].plot_bg_heatmaps(save=1)

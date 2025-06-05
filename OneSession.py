@@ -29,6 +29,7 @@ class OneSession:
         self.arduino_dir = os.path.join(self.animal_dir, 'raw_data', TTL_file_list[session])
         self.fig_export_dir = os.path.join(self.animal_dir, 'figures', self.signal_dir[-21:-7])
         self.processed_dir = os.path.join(self.animal_dir, 'processed_data')
+        os.makedirs(self.processed_dir, exist_ok=True)
         print("This class is" + " session " + self.signal_dir[-23:-7])
         self.pi_events, self.neural_events = func.data_read_sync(self.behav_dir, self.signal_dir, self.arduino_dir)
         if self.pi_events['task'].iloc[10] == 'single_reward':
@@ -85,6 +86,50 @@ class OneSession:
         self.zscore['green_right'] = stats.zscore(self.dFF0['green_right'].tolist(), nan_policy='omit')
         self.zscore['green_left'] = stats.zscore(self.dFF0['green_left'].to_list(), nan_policy='omit')
 
+    def save_dFF0_and_zscore(self, format='parquet'):
+        """
+        Saves self.dFF0 and self.zscore to the processed_dir.
+        Args:
+            format (str): The format to save the DataFrames ('parquet', 'csv', or 'pickle').
+        """
+        if self.dFF0 is None and self.zscore is None:
+            print("dFF0 and zscore have not been calculated. Nothing to save.")
+            return
+
+
+        session_identifier = self.signal_dir[-23:-7]
+
+        if self.dFF0 is not None:
+            dff0_filename = f"{self.animal}_{session_identifier}_dFF0.{format}"
+            dff0_path = os.path.join(self.processed_dir, dff0_filename)
+            try:
+                if format == 'parquet':
+                    self.dFF0.to_parquet(dff0_path)
+                elif format == 'csv':
+                    self.dFF0.to_csv(dff0_path, index=False)
+                elif format == 'pickle':
+                    self.dFF0.to_pickle(dff0_path)
+                else:
+                    print(f"Unsupported format: {format}")
+                    return
+                print(f"Saved dFF0 to {dff0_path}")
+            except Exception as e:
+                print(f"Error saving dFF0: {e}")
+
+        if self.zscore is not None and not self.zscore.empty:
+            zscore_filename = f"{self.animal}_{session_identifier}_zscore.{format}"
+            zscore_path = os.path.join(self.processed_dir, zscore_filename)
+            try:
+                if format == 'parquet':
+                    self.zscore.to_parquet(zscore_path)
+                elif format == 'csv':
+                    self.zscore.to_csv(zscore_path, index=False)
+                elif format == 'pickle':
+                    self.zscore.to_pickle(zscore_path)
+                # No else needed here if already handled for dFF0
+                print(f"Saved zscore to {zscore_path}")
+            except Exception as e:
+                print(f"Error saving zscore: {e}")
     def remove_outliers_dFF0(self):
         col_name_obj = self.dFF0.columns
         for branch in {col_name_obj[i] for i in range(1, col_name_obj.size)}:
@@ -1270,9 +1315,10 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ043', 23, include_branch='both', port_swap=0)
+    test_session = OneSession('SZ036', 11, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
+    test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
     # test_session.extract_bg_behav_by_trial()
