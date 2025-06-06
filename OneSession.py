@@ -1,4 +1,6 @@
 import os
+import pickle
+import config
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
@@ -6,32 +8,29 @@ import scipy.stats as stats
 from matplotlib import pyplot as plt
 import seaborn as sns
 import joblib
-import func
+import helper
 
 
 class OneSession:
     def __init__(self, animal_str, session, include_branch='both', port_swap=0):
         self.include_branch = include_branch
 
-        lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
-        self.animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
-        raw_dir = os.path.join(self.animal_dir, 'raw_data')
-        # lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
-        # self.animal_dir = os.path.join(lab_dir, animal_str)
-        # raw_dir = os.path.join(self.animal_dir, 'raw_data')
-        FP_file_list = func.list_files_by_time(raw_dir, file_type='FP', print_names=0)
-        behav_file_list = func.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
-        TTL_file_list = func.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
+        self.animal_dir = os.path.normpath(os.path.join(config.MAIN_DATA_ROOT, animal_str))
+        raw_dir = os.path.join(self.animal_dir, config.RAW_DATA_SUBDIR)
+
+        FP_file_list = helper.list_files_by_time(raw_dir, file_type='FP', print_names=0)
+        behav_file_list = helper.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
+        TTL_file_list = helper.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
 
         self.animal = animal_str
         self.behav_dir = os.path.join(self.animal_dir, 'raw_data', behav_file_list[session])
         self.signal_dir = os.path.join(self.animal_dir, 'raw_data', FP_file_list[session])
         self.arduino_dir = os.path.join(self.animal_dir, 'raw_data', TTL_file_list[session])
-        self.fig_export_dir = os.path.join(self.animal_dir, 'figures', self.signal_dir[-21:-7])
-        self.processed_dir = os.path.join(self.animal_dir, 'processed_data')
+        self.fig_export_dir = os.path.join(self.animal_dir, config.FIGURE_SUBDIR, self.signal_dir[-21:-7])
+        self.processed_dir = os.path.join(self.animal_dir, config.PROCESSED_DATA_SUBDIR)
         os.makedirs(self.processed_dir, exist_ok=True)
         print("This class is" + " session " + self.signal_dir[-23:-7])
-        self.pi_events, self.neural_events = func.data_read_sync(self.behav_dir, self.signal_dir, self.arduino_dir)
+        self.pi_events, self.neural_events = helper.data_read_sync(self.behav_dir, self.signal_dir, self.arduino_dir)
         if self.pi_events['task'].iloc[10] == 'single_reward':
             self.task = 'single_reward'
         elif self.pi_events['task'].iloc[10] == 'cued_no_forgo_forced':
@@ -66,70 +65,27 @@ class OneSession:
         self.DA_vs_NRI_IRI = pd.DataFrame()
         self.bg_behav_by_trial = pd.DataFrame()
 
+    # --- Data Loading and Initial Processing ---
     def examine_raw(self, save=0):
-        func.check_framedrop(self.neural_events)
-        raw_separated = func.de_interleave(self.neural_events, session_label=self.signal_dir[-23:-7], plot=1,
-                                           save=save,
-                                           save_path=self.fig_export_dir)
+        helper.check_framedrop(self.neural_events)
+        raw_separated = helper.de_interleave(self.neural_events, session_label=self.signal_dir[-23:-7], plot=1,
+                                             save=save,
+                                             save_path=self.fig_export_dir)
 
     def calculate_dFF0(self, plot=0, plot_middle_step=0, save=0):
-        raw_separated = func.de_interleave(self.neural_events, session_label=self.signal_dir[-23:-7],
-                                           plot=plot_middle_step,
-                                           save=0, save_path=self.fig_export_dir)
-        self.dFF0 = func.calculate_dFF0_Hamilos(raw_separated,
-                                                session_label=f'{self.animal}: {self.signal_dir[-23:-7]}',
-                                                plot=plot,
-                                                plot_middle_steps=plot_middle_step, save=save,
-                                                save_path=self.fig_export_dir)
+        raw_separated = helper.de_interleave(self.neural_events, session_label=self.signal_dir[-23:-7],
+                                             plot=plot_middle_step,
+                                             save=0, save_path=self.fig_export_dir)
+        self.dFF0 = helper.calculate_dFF0_Hamilos(raw_separated,
+                                                  session_label=f'{self.animal}: {self.signal_dir[-23:-7]}',
+                                                  plot=plot,
+                                                  plot_middle_steps=plot_middle_step, save=save,
+                                                  save_path=self.fig_export_dir)
         self.dFF0.name = 'dFF0'
         self.zscore = pd.DataFrame({'time_recording': self.dFF0.time_recording})
         self.zscore['green_right'] = stats.zscore(self.dFF0['green_right'].tolist(), nan_policy='omit')
         self.zscore['green_left'] = stats.zscore(self.dFF0['green_left'].to_list(), nan_policy='omit')
 
-    def save_dFF0_and_zscore(self, format='parquet'):
-        """
-        Saves self.dFF0 and self.zscore to the processed_dir.
-        Args:
-            format (str): The format to save the DataFrames ('parquet', 'csv', or 'pickle').
-        """
-        if self.dFF0 is None and self.zscore is None:
-            print("dFF0 and zscore have not been calculated. Nothing to save.")
-            return
-
-
-        session_identifier = self.signal_dir[-23:-7]
-
-        if self.dFF0 is not None:
-            dff0_filename = f"{self.animal}_{session_identifier}_dFF0.{format}"
-            dff0_path = os.path.join(self.processed_dir, dff0_filename)
-            try:
-                if format == 'parquet':
-                    self.dFF0.to_parquet(dff0_path)
-                elif format == 'csv':
-                    self.dFF0.to_csv(dff0_path, index=False)
-                elif format == 'pickle':
-                    self.dFF0.to_pickle(dff0_path)
-                else:
-                    print(f"Unsupported format: {format}")
-                    return
-                print(f"Saved dFF0 to {dff0_path}")
-            except Exception as e:
-                print(f"Error saving dFF0: {e}")
-
-        if self.zscore is not None and not self.zscore.empty:
-            zscore_filename = f"{self.animal}_{session_identifier}_zscore.{format}"
-            zscore_path = os.path.join(self.processed_dir, zscore_filename)
-            try:
-                if format == 'parquet':
-                    self.zscore.to_parquet(zscore_path)
-                elif format == 'csv':
-                    self.zscore.to_csv(zscore_path, index=False)
-                elif format == 'pickle':
-                    self.zscore.to_pickle(zscore_path)
-                # No else needed here if already handled for dFF0
-                print(f"Saved zscore to {zscore_path}")
-            except Exception as e:
-                print(f"Error saving zscore: {e}")
     def remove_outliers_dFF0(self):
         col_name_obj = self.dFF0.columns
         for branch in {col_name_obj[i] for i in range(1, col_name_obj.size)}:
@@ -141,8 +97,8 @@ class OneSession:
 
     def process_behavior_data(self, save=0):
         self.pi_events["time_recording"] = (self.pi_events['time'] - self.neural_events.timestamps[0]) / 1000
-        self.pi_events = func.data_reduction(self.pi_events, lick_tol=.01, head_tol=0.2)
-        self.pi_events = func.add_2ndry_properties_to_pi_events(self.pi_events)
+        self.pi_events = helper.data_reduction(self.pi_events, lick_tol=.01, head_tol=0.2)
+        self.pi_events = helper.add_2ndry_properties_to_pi_events(self.pi_events)
         # self.pi_events.reset_index(drop=True, inplace=True)
         self.idx_taskbegin = self.dFF0.index[
             self.dFF0['time_recording'] >= self.pi_events['time_recording'].min()].min()
@@ -150,10 +106,11 @@ class OneSession:
         if save:
             self.pi_events.to_csv(f"{self.animal_dir}/{self.signal_dir[-21:-7]}_pi_events.csv")
 
-    # this function would depend on the execution of self.process_behavior_data()
+    # --- Exploratory Analysis and Visualization ---
     def actual_leave_vs_adjusted_optimal(self, save=0):
-        self.intervals_df = func.make_intervals_df(self.pi_events)
-        func.visualize_adjusted_optimal(self.intervals_df, save=save, save_path=self.fig_export_dir)
+        # this function would depend on the execution of self.process_behavior_data()
+        self.intervals_df = helper.make_intervals_df(self.pi_events)
+        helper.visualize_adjusted_optimal(self.intervals_df, save=save, save_path=self.fig_export_dir)
 
     def extract_bg_behav_by_trial(self):
         is_trial_start = (self.pi_events['key'] == 'trial') & (self.pi_events['value'] == 1)
@@ -654,7 +611,7 @@ class OneSession:
         condition_exp_exit = (self.pi_events['port'] == 1) & (self.pi_events['value'] == 0) & (
                 self.pi_events['key'] == 'head') & (self.pi_events.is_valid)
         for branch in branch_list:
-            df_for_heatmap_bg, df_bg_r_trial_info, dfplot_entry, dfplot_exit, dfplot_reward, dfplot_lick = func.construct_matrix_for_heatmap(
+            df_for_heatmap_bg, df_bg_r_trial_info, dfplot_entry, dfplot_exit, dfplot_reward, dfplot_lick = helper.construct_matrix_for_heatmap(
                 self.pi_events, self.dFF0,
                 branch=branch[0],
                 vmin=-1, vmax=12,
@@ -664,9 +621,9 @@ class OneSession:
                 orderleft_condition=None,
                 orderright_condition=None,
                 time0_name=f'BgEntry', order_name='RealTime')
-            func.plot_heatmap_from_matrix(df_for_heatmap_bg, df_bg_r_trial_info, dfplot_entry, dfplot_exit,
-                                          dfplot_reward, dfplot_lick, cbarmin=branch[1], cbarmax=branch[2] * 0.37,
-                                          plot_lick=0, split_block=1, save=save, save_path=self.fig_export_dir)
+            helper.plot_heatmap_from_matrix(df_for_heatmap_bg, df_bg_r_trial_info, dfplot_entry, dfplot_exit,
+                                            dfplot_reward, dfplot_lick, cbarmin=branch[1], cbarmax=branch[2] * 0.37,
+                                            plot_lick=0, split_block=1, save=save, save_path=self.fig_export_dir)
 
     def plot_heatmaps(self, save=0):
         cbarmin_l = int(np.nanpercentile(self.dFF0['green_left'].values, 0.1) * 100)
@@ -674,16 +631,16 @@ class OneSession:
         cbarmax_l = np.nanpercentile(self.dFF0['green_left'].iloc[self.idx_taskbegin:self.idx_taskend], 100) * 100
         cbarmax_r = np.nanpercentile(self.dFF0['green_right'].iloc[self.idx_taskbegin:self.idx_taskend], 100) * 100
         if self.include_branch == 'both':
-            func.plot_heatmap(self.pi_events, self.dFF0, 'green_left', cbarmin=cbarmin_l, cbarmax=cbarmax_l, save=save,
-                              save_path=self.fig_export_dir)
-            func.plot_heatmap(self.pi_events, self.dFF0, 'green_right', cbarmin=cbarmin_r, cbarmax=cbarmax_r, save=save,
-                              save_path=self.fig_export_dir)
+            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_left', cbarmin=cbarmin_l, cbarmax=cbarmax_l, save=save,
+                                save_path=self.fig_export_dir)
+            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_right', cbarmin=cbarmin_r, cbarmax=cbarmax_r, save=save,
+                                save_path=self.fig_export_dir)
         elif self.include_branch == 'only_right':
-            func.plot_heatmap(self.pi_events, self.dFF0, 'green_right', cbarmin=cbarmin_r, cbarmax=cbarmax_r, save=save,
-                              save_path=self.fig_export_dir)
+            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_right', cbarmin=cbarmin_r, cbarmax=cbarmax_r, save=save,
+                                save_path=self.fig_export_dir)
         elif self.include_branch == 'only_left':
-            func.plot_heatmap(self.pi_events, self.dFF0, 'green_left', cbarmin=cbarmin_l, cbarmax=cbarmax_l, save=save,
-                              save_path=self.fig_export_dir)
+            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_left', cbarmin=cbarmin_l, cbarmax=cbarmax_l, save=save,
+                                save_path=self.fig_export_dir)
         elif self.include_branch == 'neither':
             print("No branch is available.")
         else:
@@ -691,20 +648,20 @@ class OneSession:
 
     def extract_transient(self, plot_zscore=0, plot_dff0=0):
         if self.include_branch == 'both':
-            self.transient_r = func.extract_transient_info('green_right', self.dFF0, self.pi_events,
-                                                           plot_zscore=plot_zscore,
-                                                           plot=plot_dff0)
-            self.transient_l = func.extract_transient_info('green_left', self.dFF0, self.pi_events,
-                                                           plot_zscore=plot_zscore,
-                                                           plot=plot_dff0)
+            self.transient_r = helper.extract_transient_info('green_right', self.dFF0, self.pi_events,
+                                                             plot_zscore=plot_zscore,
+                                                             plot=plot_dff0)
+            self.transient_l = helper.extract_transient_info('green_left', self.dFF0, self.pi_events,
+                                                             plot_zscore=plot_zscore,
+                                                             plot=plot_dff0)
         elif self.include_branch == 'only_right':
-            self.transient_r = func.extract_transient_info('green_right', self.dFF0, self.pi_events,
-                                                           plot_zscore=plot_zscore,
-                                                           plot=plot_dff0)
+            self.transient_r = helper.extract_transient_info('green_right', self.dFF0, self.pi_events,
+                                                             plot_zscore=plot_zscore,
+                                                             plot=plot_dff0)
         elif self.include_branch == 'only_left':
-            self.transient_l = func.extract_transient_info('green_left', self.dFF0, self.pi_events,
-                                                           plot_zscore=plot_zscore,
-                                                           plot=plot_dff0)
+            self.transient_l = helper.extract_transient_info('green_left', self.dFF0, self.pi_events,
+                                                             plot_zscore=plot_zscore,
+                                                             plot=plot_dff0)
         elif self.include_branch == 'neither':
             pass
         else:
@@ -720,23 +677,23 @@ class OneSession:
                     self.transient_r['peak_time'] < 1020)]) / 9
             self.transient_midmag_r = self.transient_r['height'].median()
 
-    # this function depends on the execution of function self.extract_transient()
     def visualize_correlation_scatter(self, plot=0, save=0):
+        # this function depends on the execution of function self.extract_transient()
         if len(self.transient_l.index > 10):
-            self.corr_l = func.visualize_trial_by_trial(self.transient_l, self.dFF0, 'green_left',
-                                                        session_label=self.signal_dir[-23:-7],
-                                                        plot=1, save=save, save_path=self.fig_export_dir,
-                                                        left_or_right='left',
-                                                        task=self.task)
+            self.corr_l = helper.visualize_trial_by_trial(self.transient_l, self.dFF0, 'green_left',
+                                                          session_label=self.signal_dir[-23:-7],
+                                                          plot=1, save=save, save_path=self.fig_export_dir,
+                                                          left_or_right='left',
+                                                          task=self.task)
         if len(self.transient_r.index > 10):
-            self.corr_r = func.visualize_trial_by_trial(self.transient_r, self.dFF0, 'green_right',
-                                                        session_label=self.signal_dir[-23:-7],
-                                                        plot=1, save=save, save_path=self.fig_export_dir,
-                                                        left_or_right='right',
-                                                        task=self.task)
+            self.corr_r = helper.visualize_trial_by_trial(self.transient_r, self.dFF0, 'green_right',
+                                                          session_label=self.signal_dir[-23:-7],
+                                                          plot=1, save=save, save_path=self.fig_export_dir,
+                                                          left_or_right='right',
+                                                          task=self.task)
 
     def extract_reward_features_and_DA(self, plot=0, save_dataframe=0):
-        df_iri_exp = func.extract_intervals_expreward(
+        df_iri_exp = helper.extract_intervals_expreward(
             self.pi_events,
             ani_str=self.animal,
             ses_str=self.signal_dir[-21:-7]
@@ -829,7 +786,7 @@ class OneSession:
                     print(f"No valid trials for {branch} in group {i + 1}, skipping...")
                     continue
                 else:
-                    df_avg, df_trial_info = func.construct_matrix_for_average_traces(
+                    df_avg, df_trial_info = helper.construct_matrix_for_average_traces(
                         self.zscore, branch,
                         df.loc[df['next_reward_time'].notna(), 'reward_time'].to_numpy(),
                         df.loc[df['next_reward_time'].notna(), 'next_reward_time'].to_numpy(),
@@ -883,7 +840,7 @@ class OneSession:
             if plot_linecharts:
                 # plt.tight_layout()
                 # rect = [0.3, 0.59, 0.4, 0.4]
-                # ax1 = func.add_subplot_axes(axes[2, 1], rect)
+                # ax1 = helper.add_subplot_axes(axes[2, 1], rect)
                 # ax1.scatter(avr_all[:, 0], avr_all[:, 1], c='k', marker='o', s=15)
                 # if block_split:
                 #     ax1.scatter(avr_low[:, 0], avr_low[:, 1], c=self.block_palette[0], marker='o', s=20,
@@ -919,7 +876,7 @@ class OneSession:
         for i in range(len(interval_vals)):
             lower_bound, upper_bound = (3 * i, 3 * (i + 1))
             df_in_range = df[(df['time_in_port'] > lower_bound) & (df['time_in_port'] < upper_bound)]
-            df_avg, df_trial_info = func.construct_matrix_for_average_traces(
+            df_avg, df_trial_info = helper.construct_matrix_for_average_traces(
                 self.zscore, branch,
                 df_in_range.loc[df_in_range['next_reward_time'].notna(), 'reward_time'].to_numpy(),
                 df_in_range.loc[df_in_range['next_reward_time'].notna(), 'next_reward_time'].to_numpy(),
@@ -943,7 +900,7 @@ class OneSession:
         plt.show()
 
     def bg_port_in_block_reversal(self, plot_single_traes=0, plot_average=0):
-        df_intervals_bg = func.extract_intervals_bg_inport(self.pi_events)
+        df_intervals_bg = helper.extract_intervals_bg_inport(self.pi_events)
 
         col_name_obj = self.dFF0.columns[1:]
 
@@ -967,7 +924,7 @@ class OneSession:
             if len(unique_blocks) > 0:
                 first_four_block1 = df_intervals_bg[df_intervals_bg['block_sequence'] == unique_blocks[0]].iloc[:4]
                 if not first_four_block1.empty:
-                    time_series_block1, trial_info_block1 = func.construct_matrix_for_average_traces(
+                    time_series_block1, trial_info_block1 = helper.construct_matrix_for_average_traces(
                         self.zscore, branch,
                         first_four_block1['entry'].to_numpy(),
                         first_four_block1['exit'].to_numpy(),
@@ -995,9 +952,9 @@ class OneSession:
             for i in range(1, len(unique_blocks)):
                 prev_block, current_block = unique_blocks[i - 1], unique_blocks[i]
 
-                # It's assumed func.process_block_transition returns time_series_df
+                # It's assumed helper.process_block_transition returns time_series_df
                 # where rows are the trials: -2, -1, 0 (switch), +1, +2, +3 relative to switch
-                _transition_df, _time_series_df, _trial_info_df, _reward_df = func.process_block_transition(
+                _transition_df, _time_series_df, _trial_info_df, _reward_df = helper.process_block_transition(
                     prev_block, current_block, df_intervals_bg, reward_columns, self.zscore, branch
                 )
 
@@ -1209,9 +1166,9 @@ class OneSession:
         return DA_in_block_transition
 
     def visualize_DA_vs_NRI_IRI(self, plot_histograms=0, plot_scatters=0, save=0):
-        df_IRI_exp = func.extract_intervals_expreward(self.pi_events, plot_histograms=plot_histograms,
-                                                      ani_str=self.animal,
-                                                      ses_str=self.signal_dir[-21:-7])
+        df_IRI_exp = helper.extract_intervals_expreward(self.pi_events, plot_histograms=plot_histograms,
+                                                        ani_str=self.animal,
+                                                        ses_str=self.signal_dir[-21:-7])
         df = df_IRI_exp
 
         arr_NRI = df['time_in_port'].to_numpy()
@@ -1260,9 +1217,9 @@ class OneSession:
         self.DA_vs_NRI_IRI = df_long.dropna().reset_index(drop=True)
 
     def scatterplot_nonreward_DA_vs_NRI(self, exclude_refractory=True, plot=0):
-        df_IRI_exp = func.extract_intervals_expreward(self.pi_events, plot_histograms=0,
-                                                      ani_str=self.animal,
-                                                      ses_str=self.signal_dir[-21:-7])
+        df_IRI_exp = helper.extract_intervals_expreward(self.pi_events, plot_histograms=0,
+                                                        ani_str=self.animal,
+                                                        ses_str=self.signal_dir[-21:-7])
         print('hello')
 
     def extract_binned_da_vs_reward_history_matrix(self, binsize=0.1, save=0):
@@ -1302,7 +1259,7 @@ class OneSession:
         binned_means['reward_num'] = reward_num_in_bin
         binned_means['trial'] = trial
         binned_means['animal'] = self.animal
-        binned_means = func.construct_reward_history_matrix(binned_means, binsize=binsize)
+        binned_means = helper.construct_reward_history_matrix(binned_means, binsize=binsize)
         if save:
             df_to_save = binned_means[['animal', 'trial', 'bin', 'bin_idx', 'reward_num', 'green_right', 'green_left',
                                        'history_matrix_sparse']]
@@ -1313,14 +1270,94 @@ class OneSession:
             df_to_save.to_pickle(os.path.join(self.processed_dir, 'binned_DA_reward_history',
                                               f'{self.animal}_{self.signal_dir[-23:-7]}_binned_DA_vs_history.pkl'))
 
+    # --- Data Saving Methods ---
+    def _save_data_object(self, data_object, object_name_for_file, format='parquet', **kwargs):
+        """
+        Helper method to save a data object to the processed_dir.
+        Args:
+            data_object: The data to save.
+            object_name_for_file (str): String to use in the filename.
+            format (str): 'parquet', 'csv', 'pickle', 'npy'.
+            **kwargs: Additional keyword arguments to pass to the save function
+                      (e.g., index=False for to_csv).
+        """
+        if data_object is None:
+            print(f"Data for '{object_name_for_file}' is None. Nothing to save.")
+            return
+
+        if isinstance(data_object, pd.DataFrame) and data_object.empty:
+            print(f"DataFrame '{object_name_for_file}' is empty. Nothing to save.")
+            return
+
+        os.makedirs(self.processed_dir, exist_ok=True)
+        session_identifier = self.signal_dir[-23:-7]
+        filename_base = f"{self.animal}_{session_identifier}_{object_name_for_file}"
+
+        # Adjust extension based on format for some types
+        actual_format = format
+        if isinstance(data_object, np.ndarray) and format != 'npy':
+            print(f"NumPy array will be saved in .npy format for {object_name_for_file}.")
+            actual_format = 'npy' # Force .npy for numpy arrays if np.save is used
+
+        file_path = os.path.join(self.processed_dir, f"{filename_base}.{actual_format}")
+
+        try:
+            if isinstance(data_object, pd.DataFrame) or isinstance(data_object, pd.Series):
+                if format == 'parquet':
+                    data_object.to_parquet(file_path, **kwargs)
+                elif format == 'pickle':
+                    data_object.to_pickle(file_path, **kwargs)
+                elif format == 'csv':
+                    # Pass index=False by default if not specified in kwargs for CSV
+                    kwargs.setdefault('index', False)
+                    data_object.to_csv(file_path, **kwargs)
+                else:
+                    print(f"Unsupported format '{format}' for DataFrame. Not saved.")
+                    return
+            elif isinstance(data_object, np.ndarray):
+                if actual_format == 'npy': # np.save expects .npy
+                     np.save(file_path, data_object) # np.save doesn't take **kwargs generally
+                else: # Should not happen if we force 'npy'
+                    print(f"Cannot save NumPy array {object_name_for_file} in format {format}")
+                    return
+            elif format == 'pickle': # Fallback for other types like lists, dictionaries, and custom Python objects
+                with open(file_path, 'wb') as f:
+                    pickle.dump(data_object, f)
+            else:
+                print(f"Cannot save type {type(data_object)} with format {format} unless it's 'pickle'.")
+                return
+
+            print(f"Saved {object_name_for_file} to {file_path}")
+
+        except Exception as e:
+            print(f"Error saving {object_name_for_file} to {file_path}: {e}")
+    def save_dFF0_and_zscore(self, format='parquet'):
+        if self.dFF0 is not None:
+            self._save_data_object(self.dFF0, "dFF0", format)
+        if self.zscore is not None: # The empty check is now inside _save_data_object
+            self._save_data_object(self.zscore, "zscore", format)
+    def save_pi_events(self, format='csv'): # pi_events might be best as CSV
+         if self.pi_events is not None:
+             if format == 'csv':
+                 self._save_data_object(self.pi_events, "pi_events_processed", format, index=False)
+             else:
+                 self._save_data_object(self.pi_events, "pi_events_processed", format)
+    def save_reward_features_DA(self, format='parquet'):
+        if self.reward_features_DA is not None:
+            if format == 'csv':
+                self._save_data_object(self.reward_features_DA, "reward_features_DA", format, index=False)
+            else:
+                self._save_data_object(self.reward_features_DA, "reward_features_DA", format)
+
 
 if __name__ == '__main__':
     test_session = OneSession('SZ036', 11, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
-    test_session.save_dFF0_and_zscore(format='parquet')
+    # test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
+    test_session.save_pi_events(format='parquet')
     # test_session.extract_bg_behav_by_trial()
     # test_session.plot_reward_aligned_lick_histograms()
     # test_session.calculate_lick_rates_around_bg_reward(reward_idx_to_align=2, plot_comparison=1)

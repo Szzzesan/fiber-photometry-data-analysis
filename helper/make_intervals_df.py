@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from func.get_trial_events import get_trial_events
+from helper.get_trial_events import get_trial_events
 
 
 def get_trial_group(events):

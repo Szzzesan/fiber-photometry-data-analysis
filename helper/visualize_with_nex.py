@@ -1,8 +1,8 @@
 import nex
 import os
-from func.NexFileData import *
-import func.NexFileWriters
-import func.NexFileHeaders
+from helper.NexFileData import *
+import helper.NexFileWriters
+import helper.NexFileHeaders
 
 
 def visualize_with_nex(animal_dir, all_events_df, behav_trial_df, dFF0_df, session_label, fps=80):
@@ -46,6 +46,6 @@ def visualize_with_nex(animal_dir, all_events_df, behav_trial_df, dFF0_df, sessi
         # fd.Continuous.append(Continuous('cont2', 10000, [5.1, 42], [0, 3], [127, 129, 22, 23]))
     # fd.Waveforms.append(Waveform('waveform1', 10000, [5.1, 42], 3, [127, 129, 22, 23, 99, 200]))
 
-    writer = func.NexFileWriters.NexFileWriter()
+    writer = helper.NexFileWriters.NexFileWriter()
     path = os.path.join(animal_dir, 'nex_data', nex_name)
     writer.WriteDataToNexFile(fd, path)

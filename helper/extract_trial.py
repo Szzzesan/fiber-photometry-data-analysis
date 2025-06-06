@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import func
+import helper
 
 
 def get_leave_times(pi_events):
@@ -11,7 +11,7 @@ def get_leave_times(pi_events):
     exp_entries = pi_events[(pi_events.key == 'head') & (pi_events.value == 1) & (pi_events.port == 1) & non_reward]
     exp_exits = pi_events[(pi_events.key == 'head') & (pi_events.value == 0) & (pi_events.port == 1) & non_reward]
     bg_end_times = bg_end_times[bg_end_times.time_recording < exp_entries.time_recording.max()]
-    ind, dif = func.min_dif(bg_end_times.time_recording, exp_entries.time_recording, return_index=True)
+    ind, dif = helper.min_dif(bg_end_times.time_recording, exp_entries.time_recording, return_index=True)
     exp_entries = exp_entries.iloc[np.unique(ind)]
     exp_entries = exp_entries.groupby('trial').time_recording.max()
     exp_exits = exp_exits.groupby('trial').time_recording.max()
@@ -37,7 +37,7 @@ def extract_trial(pi_events_df):
                                       "exp_exits", "exp_rewards", "exp_licks", "phase", "trial_start", "trial_end"])
     pi_trials.trial = pi_trials.index + 1
     for trial in pi_trials.trial:
-        enex = func.get_entry_exit(pi_events_df, trial)
+        enex = helper.get_entry_exit(pi_events_df, trial)
         i = trial - 1
         pi_trials.bg_entries[i] = enex[0]
         pi_trials.bg_exits[i] = enex[1]

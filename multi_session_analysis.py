@@ -1,5 +1,5 @@
 import os
-import func
+import helper
 from OneSession import OneSession
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -286,10 +286,10 @@ def stats_analysis_intervals_vs_DA(ani_summary):
 #     df_combined = pd.concat(df_list, ignore_index=True)
 #
 #     if run_statistics:
-#         # func.run_statistical_analysis(df_combined, 'pearson')
-#         # func.run_statistical_analysis(df_combined, 'spearman')
-#         func.run_statistical_analysis(df_combined, 'linear_regression')
-#         func.run_statistical_analysis(df_combined, 'ANOVA')
+#         # helper.run_statistical_analysis(df_combined, 'pearson')
+#         # helper.run_statistical_analysis(df_combined, 'spearman')
+#         helper.run_statistical_analysis(df_combined, 'linear_regression')
+#         helper.run_statistical_analysis(df_combined, 'ANOVA')
 #     def plot_DA_NRI_IRI_scatters(df, DA_col, title):
 #
 #         # Sort dataframe so that lower DA_col values (darker) are plotted first
@@ -417,9 +417,9 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
     # lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
     # animal_dir = os.path.join(lab_dir, animal_str)
     # raw_dir = os.path.join(animal_dir, 'raw_data')
-    FP_file_list = func.list_files_by_time(raw_dir, file_type='FP', print_names=0)
-    behav_file_list = func.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
-    TTL_file_list = func.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
+    FP_file_list = helper.list_files_by_time(raw_dir, file_type='FP', print_names=0)
+    behav_file_list = helper.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
+    TTL_file_list = helper.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
     xsession_figure_export_dir = os.path.join(animal_dir, 'figures')
     # Declaring namedtuple()
     df1 = pd.DataFrame(
@@ -463,8 +463,9 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
                                                          port_swap=port_swap)
             # ani_summary.session_obj_list[i].examine_raw(save=1)
             ani_summary.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
-            ani_summary.session_obj_list[i].save_dFF0_and_zscore(format='parquet')
+            # ani_summary.session_obj_list[i].save_dFF0_and_zscore(format='parquet')
             ani_summary.session_obj_list[i].process_behavior_data(save=0)
+            ani_summary.session_obj_list[i].save_pi_events(format='parquet')
             # DA_block_transition_list[i] = ani_summary.session_obj_list[i].bg_port_in_block_reversal(plot_single_traes=0,
             #                                                                                         plot_average=0)
             # ani_summary.session_obj_list[i].extract_bg_behav_by_trial()

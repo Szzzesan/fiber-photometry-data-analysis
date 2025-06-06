@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import math
-import func
+import helper
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import seaborn as sns
@@ -111,7 +111,7 @@ def construct_matrix_for_heatmap(pi_events, dFF0, branch, vmin, vmax, time0_cond
     master_df_lick = pd.DataFrame(columns=['frame', 'row'])
 
     for i in range(mat_row_num):
-        time0_idx = func.find_closest_value(dFF0['time_recording'], time0[i])
+        time0_idx = helper.find_closest_value(dFF0['time_recording'], time0[i])
         offset_l = min(plot_frame_dist_l, filter_frame_dist_l[i])
         np_mat[i, (plot_frame_dist_l - offset_l):plot_frame_dist_l] = dFF0[branch].iloc[
                                                                       (time0_idx - offset_l):time0_idx].to_numpy()

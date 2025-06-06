@@ -1,41 +1,31 @@
 import pandas as pd
+from helper.framedrop_remedy import framedrop_remedy
 import matplotlib.pyplot as plt
-from func.beads_detrend import beads_detrend
-from func.butterworth_detrend import butterworth_detrend
-from func.moving_average_denoise import moving_average_denoise
-from func.lin_reg_fit import lin_reg_fit
+from helper.butterworth_detrend import butterworth_detrend
+from helper.beads_detrend import beads_detrend
+from helper.moving_average_denoise import moving_average_denoise
+from helper.lin_reg_fit import lin_reg_fit
 import os
 
 
-def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False',
+def calculate_dFF0(raw_separated, session_label, save_path, plot='False',
                    plot_middle_steps='False', save='False'):
     num_color_site = int(len(raw_separated.columns) / 2 - 1)
 
     # region Preprocessing
     # raw_separated = framedrop_remedy(raw_separated, plot=plot_middle_steps)
-    detrended = butterworth_detrend(raw_separated, fps=40, plot=plot_middle_steps, session_label=session_label)
-    # # region temporary: examining a random 150-sec snippet of raw data
-    # snippet = detrended[(detrended['time_recording'] > 660000) & (detrended['time_recording'] < 810000)]
-    # plt.plot(snippet['time_recording']/1000, snippet['green_left_actual'])
-    # plt.xlim(660, 810)
-    # plt.xlabel('Time (sec)')
-    # plt.ylabel('Raw measurement of photons (470 nm)')
-    # plt.title(f'{session_label} left')
-    # plt.show()
-    # # endregion
+    detrended = beads_detrend(raw_separated, plot=plot_middle_steps, session_label=session_label)
+    # detrended = butterworth_detrend(raw_separated, fps=80, plot=plot_middle_steps, session_label=session_label)
     denoised = moving_average_denoise(detrended, win_size=8, plot=plot_middle_steps, session_label=session_label)
     fitted = lin_reg_fit(denoised, plot=plot_middle_steps, session_label=session_label)
     # endregion
 
     # region Subtraction
-    F_0_timewindow = 10
-    fps = 40
-    F_0_framewindow = F_0_timewindow * fps
     dFF0 = pd.DataFrame(
-        columns=['time_recording', fitted.columns.values[1][:-4], fitted.columns.values[3][:-4]])
+        columns=['time_recording', fitted.columns.values[1][:-7], fitted.columns.values[3][:-7]])
     dFF0.iloc[:, 0] = fitted.iloc[:, 0]
     for i in range(num_color_site):
-        F_0 = fitted.iloc[:, 2 * i + 1].rolling(window=F_0_framewindow, center=True).mean()
+        F_0 = fitted.iloc[:, 2 * i + 1].mean()
         dFF0.iloc[:, i + 1] = (fitted.iloc[:, 2 * i + 1] - fitted.iloc[:, 2 * (i + 1)]) / F_0
     # endregion
 
@@ -44,7 +34,7 @@ def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False'
     if plot:
         plt.style.use('ggplot')
         for i in range(len(dFF0.columns) - 1):
-            plt.plot(dFF0.iloc[24000:30000, 0], dFF0.iloc[24000:30000, i + 1] * 100, label=dFF0.columns.values[i + 1], alpha=0.7)
+            plt.plot(dFF0.iloc[10000:15000, 0], dFF0.iloc[10000:15000, i + 1] * 100, label=dFF0.columns.values[i + 1])
         plt.legend()
         plt.xlabel('Time recording (sec)')
         plt.ylabel('dF/F0 (%)')

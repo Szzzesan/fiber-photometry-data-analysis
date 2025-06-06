@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import math
-import func
+import helper
 
 
 def construct_matrix_for_average_traces(signal, branch, time_filterleft, time_filterright, trial, phase,
@@ -17,7 +17,7 @@ def construct_matrix_for_average_traces(signal, branch, time_filterleft, time_fi
         np_mat[:] = np.nan
 
         for i in range(mat_row_num):
-            time0_idx = func.find_closest_value(signal['time_recording'], time_filterleft[i])
+            time0_idx = helper.find_closest_value(signal['time_recording'], time_filterleft[i])
             np_mat[i, 0:filter_frame_dist[i]] = signal[branch].iloc[time0_idx:time0_idx + filter_frame_dist[i]].to_numpy()
 
         assert np_mat.shape[1] == len(np.arange(0, np.round(mat_col_num * 0.025, decimals=3), 0.025))

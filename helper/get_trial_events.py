@@ -1,6 +1,6 @@
 import numpy as np
-from func.get_bools import get_bools
-from func.simple_plots import min_dif
+from helper.get_bools import get_bools
+from helper.simple_plots import min_dif
 
 
 def get_trial_events(data, entry_tolerance=.5, exit_tolerance=2, include_unrewarded=True, include_unlicked=False,

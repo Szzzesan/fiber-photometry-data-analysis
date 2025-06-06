@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
-from func.user_info import get_user_info
+from helper.user_info import get_user_info
 
 info_dict = get_user_info()
 initials = info_dict['initials']

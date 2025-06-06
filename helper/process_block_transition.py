@@ -1,5 +1,5 @@
 import pandas as pd
-import func
+import helper
 
 
 def process_block_transition(prev_block, current_block, df_intervals_bg, reward_columns, zscore, branch):
@@ -9,7 +9,7 @@ def process_block_transition(prev_block, current_block, df_intervals_bg, reward_
 
     transition_df = pd.concat([last_two, first_four], ignore_index=True)
 
-    time_series_df, trial_info_df = func.construct_matrix_for_average_traces(
+    time_series_df, trial_info_df = helper.construct_matrix_for_average_traces(
         zscore, branch,
         transition_df['entry'].to_numpy(),
         transition_df['exit'].to_numpy(),
