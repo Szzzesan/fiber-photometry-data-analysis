@@ -465,7 +465,11 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
             ani_summary.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
             # ani_summary.session_obj_list[i].save_dFF0_and_zscore(format='parquet')
             ani_summary.session_obj_list[i].process_behavior_data(save=0)
-            ani_summary.session_obj_list[i].save_pi_events(format='parquet')
+            # ani_summary.session_obj_list[i].save_pi_events(format='parquet')
+            # ani_summary.session_obj_list[i].construct_trial_df()
+            # ani_summary.session_obj_list[i].save_trial_df(format='parquet')
+            ani_summary.session_obj_list[i].construct_expreward_interval_df()
+            ani_summary.session_obj_list[i].save_expreward_df(format='parquet')
             # DA_block_transition_list[i] = ani_summary.session_obj_list[i].bg_port_in_block_reversal(plot_single_traes=0,
             #                                                                                         plot_average=0)
             # ani_summary.session_obj_list[i].extract_bg_behav_by_trial()

@@ -36,6 +36,8 @@ class OneSession:
         elif self.pi_events['task'].iloc[10] == 'cued_no_forgo_forced':
             self.task = 'multi_reward'
 
+        self.trial_df = None
+        self.expreward_df = None
         self.block_palette = sns.color_palette('Set2')
         self.port_swap = port_swap
         if self.port_swap:
@@ -105,6 +107,104 @@ class OneSession:
         self.idx_taskend = self.dFF0.index[self.dFF0['time_recording'] <= self.pi_events['time_recording'].max()].max()
         if save:
             self.pi_events.to_csv(f"{self.animal_dir}/{self.signal_dir[-21:-7]}_pi_events.csv")
+
+    def construct_trial_df(self):
+        [head, trial, cue, reward, lick, off, on, port1, port2, valid_head] = helper.get_bools(self.pi_events)
+        bg_entries = self.pi_events.loc[port2 & trial & on & valid_head, 'time_recording'].to_list()
+        bg_exits = self.pi_events.loc[port2 & head & off & valid_head, 'time_recording'].to_list()
+        exp_entries = self.pi_events.loc[port1 & head & on & valid_head, 'time_recording'].to_list()
+        exp_exits = self.pi_events.loc[port1 & head & off & valid_head, 'time_recording'].to_list()
+        trials = self.pi_events.loc[port2 & head & off & valid_head, 'trial'].to_list()
+        phase = self.pi_events.loc[port2 & head & off & valid_head, 'phase'].to_list()
+        rewards = [[] for _ in range(len(trials))]
+        licks = [[] for _ in range(len(trials))]
+        excess_bg_exits = [[] for _ in range(len(trials))]
+        excess_exp_entries = [[] for _ in range(len(trials))]
+        excess_exp_exits = [[] for _ in range(len(trials))]
+        for i, trial in enumerate(trials):
+            is_in_trial = self.pi_events['trial'] == trial
+            rewards[i] = self.pi_events.loc[reward & on & is_in_trial, 'time_recording'].to_list()
+            licks[i] = self.pi_events.loc[lick & on & is_in_trial, 'time_recording'].to_list()
+            excess_bg_exits[i] = self.pi_events.loc[port2 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
+            excess_exp_entries[i] = self.pi_events.loc[port1 & head & on & is_in_trial & ~valid_head, 'time_recording'].to_list()
+            excess_exp_exits[i] = self.pi_events.loc[port1 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
+        self.trial_df = pd.DataFrame({'trial': trials, 'phase': phase, 'rewards': rewards, 'licks': licks,
+                                      'bg_entry': bg_entries, 'bg_exit': bg_exits,
+                                      'exp_entry': exp_entries, 'exp_exit': exp_exits,
+                                      'excess_bg_exits': excess_bg_exits,
+                                      'excess_exp_exits': excess_exp_exits,
+                                      'excess_exp_entries': excess_exp_entries
+                                      })
+
+    def construct_expreward_interval_df(self):
+        [head, trial, cue, reward, lick, off, on, port1, port2, valid_head] = helper.get_bools(self.pi_events)
+        arr_reward_exp = self.pi_events.loc[port1 & reward & on, 'time_recording'].to_numpy()
+        arr_reward_bg = self.pi_events.loc[port2 & reward & on, 'time_recording'].to_numpy()
+        arr_lastreward_exp = np.insert(arr_reward_exp[:-1], 0, np.nan)
+        arr_nextreward_exp = np.append(arr_reward_exp[1:], np.nan)
+        arr_NRI = self.pi_events.loc[port1 & reward & on, 'time_in_port'].to_numpy()
+        arr_trial_exp = self.pi_events.loc[port1 & reward & on, 'trial']
+        arr_block_exp = self.pi_events.loc[port1 & reward & on, 'phase']
+        df_intervals = pd.DataFrame(
+            {'trial': arr_trial_exp, 'block': arr_block_exp, 'last_reward_time': arr_lastreward_exp,
+             'reward_time': arr_reward_exp, 'next_reward_time': arr_nextreward_exp, 'time_in_port': arr_NRI})
+        first_rewards_idx = df_intervals.groupby('trial').head(1).index
+        last_rewards_idx = df_intervals.groupby('trial').tail(1).index
+        df_intervals.loc[first_rewards_idx, 'last_reward_time'] = np.nan
+        df_intervals.loc[last_rewards_idx, 'next_reward_time'] = np.nan
+        first_rewards_times = df_intervals.loc[first_rewards_idx, 'reward_time'].to_numpy()
+        last_bg_rewards = np.searchsorted(arr_reward_bg, first_rewards_times, side='right') - 1
+        valid_bg_mask = (last_bg_rewards > 0)
+        df_intervals.loc[first_rewards_idx[valid_bg_mask], 'last_reward_time'] = arr_reward_bg[
+            last_bg_rewards[valid_bg_mask]]
+        df_intervals['IRI_prior'] = df_intervals['reward_time'] - df_intervals['last_reward_time']
+        df_intervals['IRI_post'] = df_intervals['next_reward_time'] - df_intervals['reward_time']
+        df_intervals.reset_index(inplace=True, drop=True)
+        arr_recent_reward_rate = np.zeros(df_intervals.shape[0])
+        arr_recent_reward_rate[:] = np.nan
+        arr_recent_reward_rate_exp = np.zeros(df_intervals.shape[0])
+        arr_recent_reward_rate_exp[:] = np.nan
+        arr_local_reward_rate_1sec = np.zeros(df_intervals.shape[0])
+        arr_local_reward_rate_1sec[:] = np.nan
+
+        arr_exp_exits = np.zeros(df_intervals.shape[0])
+        arr_exp_exits[:] = np.nan
+        arr_exp_entries = np.full(df_intervals.shape[0], np.nan)
+
+        for i in range(df_intervals.shape[0]):
+            search_begin = max(0, df_intervals.loc[i, 'reward_time'] - 30)
+            search_end = df_intervals.loc[i, 'reward_time']
+            is_in_range = (self.pi_events['time_recording'] >= search_begin) & (self.pi_events['time_recording'] < search_end)
+            onesec_begin = max(0, df_intervals.loc[i, 'reward_time'] - 1)
+            onesec_end = df_intervals.loc[i, 'reward_time']
+            is_in_1sec = (self.pi_events['time_recording'] >= onesec_begin) & (self.pi_events['time_recording'] < onesec_end)
+            arr_recent_reward_rate[i] = self.pi_events.loc[is_in_range & reward & on].shape[0] / (search_end - search_begin)
+            arr_recent_reward_rate_exp[i] = self.pi_events.loc[is_in_range & reward & on & port1].shape[0] / (
+                    search_end - search_begin)
+            arr_local_reward_rate_1sec[i] = self.pi_events.loc[is_in_1sec & reward & on].shape[0]
+
+            # find the exponential port entries and exits for each trial
+            def extract_single_time(time_values, trial, event_type):
+                if time_values.shape[0] == 1:
+                    return time_values[0]
+                elif time_values.shape[0] > 1:
+                    raise ValueError(
+                        f"Found {time_values.shape[0]} valid time investment port {event_type}s for trial {trial}!")
+
+            is_trial = (self.pi_events['trial'] == df_intervals.loc[i, 'trial'])
+
+            time_entry = self.pi_events.loc[is_trial & port1 & head & on & valid_head, 'time_recording'].to_numpy()
+            time_exit = self.pi_events.loc[is_trial & port1 & head & off & valid_head, 'time_recording'].to_numpy()
+            arr_exp_entries[i] = extract_single_time(time_entry, df_intervals.loc[i, 'trial'], "entry")
+            arr_exp_exits[i] = extract_single_time(time_exit, df_intervals.loc[i, 'trial'], "exit")
+
+        df_intervals['entry_time'] = arr_exp_entries
+        df_intervals['exit_time'] = arr_exp_exits
+        df_intervals['recent_reward_rate'] = arr_recent_reward_rate
+        df_intervals['recent_reward_rate_exp'] = arr_recent_reward_rate_exp
+        df_intervals['local_reward_rate_1sec'] = arr_local_reward_rate_1sec
+        df_intervals['num_rewards_prior'] = df_intervals.groupby('trial')['reward_time'].cumcount()
+        self.expreward_df = df_intervals
 
     # --- Exploratory Analysis and Visualization ---
     def actual_leave_vs_adjusted_optimal(self, save=0):
@@ -631,15 +731,19 @@ class OneSession:
         cbarmax_l = np.nanpercentile(self.dFF0['green_left'].iloc[self.idx_taskbegin:self.idx_taskend], 100) * 100
         cbarmax_r = np.nanpercentile(self.dFF0['green_right'].iloc[self.idx_taskbegin:self.idx_taskend], 100) * 100
         if self.include_branch == 'both':
-            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_left', cbarmin=cbarmin_l, cbarmax=cbarmax_l, save=save,
+            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_left', cbarmin=cbarmin_l, cbarmax=cbarmax_l,
+                                save=save,
                                 save_path=self.fig_export_dir)
-            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_right', cbarmin=cbarmin_r, cbarmax=cbarmax_r, save=save,
+            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_right', cbarmin=cbarmin_r, cbarmax=cbarmax_r,
+                                save=save,
                                 save_path=self.fig_export_dir)
         elif self.include_branch == 'only_right':
-            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_right', cbarmin=cbarmin_r, cbarmax=cbarmax_r, save=save,
+            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_right', cbarmin=cbarmin_r, cbarmax=cbarmax_r,
+                                save=save,
                                 save_path=self.fig_export_dir)
         elif self.include_branch == 'only_left':
-            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_left', cbarmin=cbarmin_l, cbarmax=cbarmax_l, save=save,
+            helper.plot_heatmap(self.pi_events, self.dFF0, 'green_left', cbarmin=cbarmin_l, cbarmax=cbarmax_l,
+                                save=save,
                                 save_path=self.fig_export_dir)
         elif self.include_branch == 'neither':
             print("No branch is available.")
@@ -741,6 +845,7 @@ class OneSession:
                           'left_DA_mean', 'left_DA_sem']
         self.DA_NRI_block_priorrewards = DA_amp[['block', 'time_in_port_bin', 'num_rewards_prior_bin',
                                                  'right_DA_mean', 'left_DA_mean']]
+        print('hello')
 
     def visualize_average_traces(self, variable='time_in_port', method='even_time', block_split=False,
                                  plot_linecharts=0, plot_histograms=0, save=0):
@@ -1045,8 +1150,9 @@ class OneSession:
                                 axes = axes.reshape(-1, 1)
 
                             plt.subplots_adjust(wspace=0.2, hspace=0.3)
-                            fig.suptitle(f"{self.animal}:{self.signal_dir[-21:-7]}\n{branch} DA Changes upon Block Switch",
-                                         fontsize=20, fontweight='bold', multialignment='center')
+                            fig.suptitle(
+                                f"{self.animal}:{self.signal_dir[-21:-7]}\n{branch} DA Changes upon Block Switch",
+                                fontsize=20, fontweight='bold', multialignment='center')
                             fig.supxlabel("Time since Entering Background Port (sec)", fontsize=18, fontweight='bold')
                             fig.supylabel("DA (in z-score)", fontsize=18, fontweight='bold')
 
@@ -1068,7 +1174,7 @@ class OneSession:
                                     ax.set_title(f"trial {trial_num_abs}")
 
                                     color = self.block_palette[0] if df_trial_info.at[j, 'phase'] == '0.4' else \
-                                    self.block_palette[1]
+                                        self.block_palette[1]
                                     ax.plot(df_ts.iloc[j], c=color, linewidth=2.5)
                                     if not df_ts.iloc[j].empty:
                                         y_min_plot = min(y_min_plot, df_ts.iloc[j].min())
@@ -1079,7 +1185,8 @@ class OneSession:
                                             ax.axvline(x_val, color='b', linestyle='--', zorder=1,
                                                        label='Reward delivered' if not delivered_label_added else "")
                                             delivered_label_added = True
-                                    if (i == 0) & (j == 0) and delivered_label_added:  # only add legend if label was set
+                                    if (i == 0) & (
+                                            j == 0) and delivered_label_added:  # only add legend if label was set
                                         ax.legend()
 
                             if y_min_plot == float('inf'): y_min_plot = -1  # Default if no data
@@ -1104,12 +1211,14 @@ class OneSession:
                             valid_indices_for_mean_plot = [idx for idx in [0, 2, 4] if idx < len(time_series_list)]
                             if len(valid_indices_for_mean_plot) > 0:
                                 selected_dfs_for_mean = [time_series_list[k] for k in valid_indices_for_mean_plot if
-                                                         time_series_list[k] is not None and len(time_series_list[k]) == 6]
+                                                         time_series_list[k] is not None and len(
+                                                             time_series_list[k]) == 6]
 
                                 if len(selected_dfs_for_mean) > 0:  # Ensure we have DFs to average
                                     mean_traces, sem_traces = [], []
                                     for row_idx in range(6):  # Assumes 6 trials (-2 to +3)
-                                        series_list_for_mean = [df.iloc[row_idx].dropna() for df in selected_dfs_for_mean if
+                                        series_list_for_mean = [df.iloc[row_idx].dropna() for df in
+                                                                selected_dfs_for_mean if
                                                                 row_idx < len(df)]
                                         if not series_list_for_mean: continue  # Skip if no data for this row_idx
 
@@ -1297,7 +1406,7 @@ class OneSession:
         actual_format = format
         if isinstance(data_object, np.ndarray) and format != 'npy':
             print(f"NumPy array will be saved in .npy format for {object_name_for_file}.")
-            actual_format = 'npy' # Force .npy for numpy arrays if np.save is used
+            actual_format = 'npy'  # Force .npy for numpy arrays if np.save is used
 
         file_path = os.path.join(self.processed_dir, f"{filename_base}.{actual_format}")
 
@@ -1315,12 +1424,12 @@ class OneSession:
                     print(f"Unsupported format '{format}' for DataFrame. Not saved.")
                     return
             elif isinstance(data_object, np.ndarray):
-                if actual_format == 'npy': # np.save expects .npy
-                     np.save(file_path, data_object) # np.save doesn't take **kwargs generally
-                else: # Should not happen if we force 'npy'
+                if actual_format == 'npy':  # np.save expects .npy
+                    np.save(file_path, data_object)  # np.save doesn't take **kwargs generally
+                else:  # Should not happen if we force 'npy'
                     print(f"Cannot save NumPy array {object_name_for_file} in format {format}")
                     return
-            elif format == 'pickle': # Fallback for other types like lists, dictionaries, and custom Python objects
+            elif format == 'pickle':  # Fallback for other types like lists, dictionaries, and custom Python objects
                 with open(file_path, 'wb') as f:
                     pickle.dump(data_object, f)
             else:
@@ -1331,17 +1440,32 @@ class OneSession:
 
         except Exception as e:
             print(f"Error saving {object_name_for_file} to {file_path}: {e}")
+
     def save_dFF0_and_zscore(self, format='parquet'):
         if self.dFF0 is not None:
             self._save_data_object(self.dFF0, "dFF0", format)
-        if self.zscore is not None: # The empty check is now inside _save_data_object
+        if self.zscore is not None:  # The empty check is now inside _save_data_object
             self._save_data_object(self.zscore, "zscore", format)
-    def save_pi_events(self, format='csv'): # pi_events might be best as CSV
-         if self.pi_events is not None:
-             if format == 'csv':
-                 self._save_data_object(self.pi_events, "pi_events_processed", format, index=False)
-             else:
-                 self._save_data_object(self.pi_events, "pi_events_processed", format)
+
+    def save_pi_events(self, format='csv'):  # pi_events might be best as CSV
+        if self.pi_events is not None:
+            if format == 'csv':
+                self._save_data_object(self.pi_events, "pi_events_processed", format, index=False)
+            else:
+                self._save_data_object(self.pi_events, "pi_events_processed", format)
+
+    def save_trial_df(self, format='parquet'):  # pi_events might be best as CSV
+        if self.pi_events is not None:
+            if format == 'csv':
+                self._save_data_object(self.trial_df, "trial_df", format, index=False)
+            else:
+                self._save_data_object(self.trial_df, "trial_df", format)
+    def save_expreward_df(self, format='parquet'):
+        if self.reward_features_DA is not None:
+            if format == 'csv':
+                self._save_data_object(self.expreward_df, "expreward_df", format, index=False)
+            else:
+                self._save_data_object(self.expreward_df, "expreward_df", format)
     def save_reward_features_DA(self, format='parquet'):
         if self.reward_features_DA is not None:
             if format == 'csv':
@@ -1351,13 +1475,17 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ036', 11, include_branch='both', port_swap=0)
+    test_session = OneSession('SZ036', 15, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
-    test_session.save_pi_events(format='parquet')
+    # test_session.save_pi_events(format='parquet')
+    # test_session.construct_trial_df()
+    # test_session.save_trial_df(format='parquet')
+    test_session.construct_expreward_interval_df()
+    test_session.save_expreward_df(format='parquet')
     # test_session.extract_bg_behav_by_trial()
     # test_session.plot_reward_aligned_lick_histograms()
     # test_session.calculate_lick_rates_around_bg_reward(reward_idx_to_align=2, plot_comparison=1)
@@ -1371,7 +1499,7 @@ if __name__ == '__main__':
     # df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
     #                                                          block_split=False,
     #                                                          plot_histograms=0, plot_linecharts=1)
-    # test_session.visualize_DA_vs_NRI_IRI(plot_scatters=1, plot_histograms=1)
+    test_session.visualize_DA_vs_NRI_IRI(plot_scatters=0, plot_histograms=0)
     DA_in_block_transition = test_session.bg_port_in_block_reversal(plot_single_traes=0, plot_average=0)
 
     # test_session.scatterplot_nonreward_DA_vs_NRI()

@@ -8,18 +8,18 @@ def get_trial_events(data, entry_tolerance=.5, exit_tolerance=2, include_unrewar
     if data.task.iloc[10] == 'single_reward':
         entry_tolerance = .05
         include_unlicked = True
-    [head, trial, cue, reward, lick, leave, start, port1, port2] = get_bools(data)
+    [head, trial, cue, reward, lick, off, on, port1, port2, valid_head] = get_bools(data)
     entries = []
     exits = []
     rewards = []
     trial_numbers = []
     active_time = []
     for trial_number in range(1, int(data.trial.max())):
-        available_time = data[cue & start & port2 & (data.trial == trial_number)].time_recording.values[0]
-        entry_times = data[head & port1 & start & (data.trial == trial_number)].time_recording.values
-        exit_times = data[head & port1 & leave & (data.trial == trial_number)].time_recording.values
-        reward_times = data[reward & port1 & start & (data.trial == trial_number)].time_recording.values
-        lick_times = data[lick & port1 & start & (data.trial == trial_number)].time_recording.values
+        available_time = data[cue & on & port2 & (data.trial == trial_number)].time_recording.values[0]
+        entry_times = data[head & port1 & on & (data.trial == trial_number)].time_recording.values
+        exit_times = data[head & port1 & off & (data.trial == trial_number)].time_recording.values
+        reward_times = data[reward & port1 & on & (data.trial == trial_number)].time_recording.values
+        lick_times = data[lick & port1 & on & (data.trial == trial_number)].time_recording.values
         trial_block = data[(data.trial == trial_number)].phase.iloc[0]
         port2_time = 10 if trial_block in ['0.4', '.4'] else 5
         if not len(exit_times):

@@ -5,14 +5,15 @@ import os
 import pickle
 
 
-def load_session_dataframe(animal_id, session_id, df_name, file_format='parquet'):
+def load_session_dataframe(animal_id, df_name, session_id=None, session_long_name=None, file_format='parquet'):
     """
     Loads a session-specific DataFrame using an integer session index instead of the long identifier string.
 
     Args:
         animal_id (str): The ID of the animal (e.g., 'SZ036').
-        session_id (int): The chronological index of the session (e.g., 0 for the first session).
         df_name (str): The name of the data product to load (e.g., 'dFF0', 'zscore').
+        session_id (int): The chronological index of the session (e.g., 0 for the first session).
+        session_long_name (str): the session identifier that's formatted as 'yyyy-mm-ddThh-mm'.
         file_format (str): The file format ('parquet', 'csv', 'pickle').
 
     Returns:
@@ -24,27 +25,32 @@ def load_session_dataframe(animal_id, session_id, df_name, file_format='parquet'
         print(f"Warning: Processed directory not found at {processed_dir}")
         return None
 
-    # 2. Find all files in that directory that match the animal and data product name
-    file_suffix = f"_{df_name}.{file_format}"
+    if session_long_name is not None:
+        target_filename = f"{animal_id}_{session_long_name}_{df_name}.{file_format}"
+    elif session_id is not None:
+        # 2. Find all files in that directory that match the animal and data product name
+        file_suffix = f"_{df_name}.{file_format}"
 
-    # List all files in the directory and filter for the ones we want
-    matching_files = [
-        f for f in os.listdir(processed_dir)
-        if f.startswith(f"{animal_id}_") and f.endswith(file_suffix)
-    ]
+        # List all files in the directory and filter for the ones we want
+        matching_files = [
+            f for f in os.listdir(processed_dir)
+            if f.startswith(f"{animal_id}_") and f.endswith(file_suffix)
+        ]
 
-    # 3. Sort the list of files chronologically (alphabetical sort works here)
-    matching_files.sort()
+        # 3. Sort the list of files chronologically (alphabetical sort works here)
+        matching_files.sort()
 
-    # 4. Check if the requested session_index is valid and select the target file
-    if not 0 <= session_id < len(matching_files):
-        print(f"Error: session_id '{session_id}' is out of bounds.")
-        print(f"Found {len(matching_files)} sessions for '{animal_id}' with data product '{df_name}'.")
-        # For debugging, see what files were found:
-        # print("Found files:", matching_files)
-        return None
+        # 4. Check if the requested session_index is valid and select the target file
+        if not 0 <= session_id < len(matching_files):
+            print(f"Error: session_id '{session_id}' is out of bounds.")
+            print(f"Found {len(matching_files)} sessions for '{animal_id}' with data product '{df_name}'.")
+            # For debugging, see what files were found:
+            # print("Found files:", matching_files)
+            return None
 
-    target_filename = matching_files[session_id]
+        target_filename = matching_files[session_id]
+
+
     file_path = os.path.join(processed_dir, target_filename)
 
     print(f"Loading: {file_path}")  # Helpful for confirming the right file is being loaded
@@ -74,5 +80,6 @@ def load_animal_summary_data(base_processed_dir, animal_id, summary_name, file_f
 if __name__ == '__main__':
     animal_str = 'SZ036'
     session_id = 11
-    zscore = load_session_dataframe(animal_str, session_id, 'zscore', file_format='parquet')
+    session_long_name = '2024-01-11T16_25'
+    zscore = load_session_dataframe(animal_str, 'zscore', session_long_name=session_long_name, session_id=11, file_format='parquet')
     print('Hello')
