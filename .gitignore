@@ -1,0 +1,12 @@
+# .gitignore
+
+# Ignore temporary development/testing files
+scratch.py
+config.py
+
+# You might also want to ignore other common Python files/folders
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+venv/
