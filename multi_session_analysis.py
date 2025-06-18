@@ -1,5 +1,6 @@
 import os
 import helper
+import config
 from OneSession import OneSession
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -411,12 +412,8 @@ def visualize_DA_vs_NRI(ani_summary):
 
 
 def multi_session_analysis(animal_str, session_list, include_branch='both', port_swap=0):
-    lab_dir = os.path.join('C:\\', 'Users', 'Shichen', 'OneDrive - Johns Hopkins', 'ShulerLab')
-    animal_dir = os.path.join(lab_dir, 'TemporalDecisionMaking', 'imaging_during_task', animal_str)
+    animal_dir = os.path.normpath(os.path.join(config.MAIN_DATA_ROOT, animal_str))
     raw_dir = os.path.join(animal_dir, 'raw_data')
-    # lab_dir = os.path.join('C:\\', 'Users', 'Valued Customer', 'Shichen')
-    # animal_dir = os.path.join(lab_dir, animal_str)
-    # raw_dir = os.path.join(animal_dir, 'raw_data')
     FP_file_list = helper.list_files_by_time(raw_dir, file_type='FP', print_names=0)
     behav_file_list = helper.list_files_by_time(raw_dir, file_type='.txt', print_names=0)
     TTL_file_list = helper.list_files_by_time(raw_dir, file_type='arduino', print_names=0)
