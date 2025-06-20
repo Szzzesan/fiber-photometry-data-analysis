@@ -121,13 +121,14 @@ class OneSession:
         excess_bg_exits = [[] for _ in range(len(trials))]
         excess_exp_entries = [[] for _ in range(len(trials))]
         excess_exp_exits = [[] for _ in range(len(trials))]
-        for i, trial in enumerate(trials):
-            is_in_trial = self.pi_events['trial'] == trial
+        for i, trial_id in enumerate(trials):
+            is_in_trial = self.pi_events['trial'] == trial_id
             rewards[i] = self.pi_events.loc[reward & on & is_in_trial, 'time_recording'].to_list()
             licks[i] = self.pi_events.loc[lick & on & is_in_trial, 'time_recording'].to_list()
             excess_bg_exits[i] = self.pi_events.loc[port2 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
             excess_exp_entries[i] = self.pi_events.loc[port1 & head & on & is_in_trial & ~valid_head, 'time_recording'].to_list()
             excess_exp_exits[i] = self.pi_events.loc[port1 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
+        # todo: the valid head judgements are a little off for swapped port design. Need to fix that
         self.trial_df = pd.DataFrame({'trial': trials, 'phase': phase, 'rewards': rewards, 'licks': licks,
                                       'bg_entry': bg_entries, 'bg_exit': bg_exits,
                                       'exp_entry': exp_entries, 'exp_exit': exp_exits,
@@ -1475,17 +1476,17 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ036', 15, include_branch='both', port_swap=0)
+    test_session = OneSession('RK009', 1, include_branch='both', port_swap=1)
     # test_session.examine_raw(save=0)
-    test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
+    test_session.calculate_dFF0(plot=1, plot_middle_step=0, save=0)
     # test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
     # test_session.save_pi_events(format='parquet')
-    # test_session.construct_trial_df()
+    test_session.construct_trial_df()
     # test_session.save_trial_df(format='parquet')
-    test_session.construct_expreward_interval_df()
-    test_session.save_expreward_df(format='parquet')
+    # test_session.construct_expreward_interval_df()
+    # test_session.save_expreward_df(format='parquet')
     # test_session.extract_bg_behav_by_trial()
     # test_session.plot_reward_aligned_lick_histograms()
     # test_session.calculate_lick_rates_around_bg_reward(reward_idx_to_align=2, plot_comparison=1)
@@ -1495,7 +1496,7 @@ if __name__ == '__main__':
     # test_session.plot_heatmaps(save=1)
     # test_session.plot_bg_heatmaps(save=0)
     # test_session.actual_leave_vs_adjusted_optimal(save=0)
-    # test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
+    test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
     # df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
     #                                                          block_split=False,
     #                                                          plot_histograms=0, plot_linecharts=1)
