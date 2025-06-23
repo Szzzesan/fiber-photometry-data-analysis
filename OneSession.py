@@ -110,7 +110,7 @@ class OneSession:
 
     def construct_trial_df(self):
         [head, trial, cue, reward, lick, off, on, port1, port2, valid_head] = helper.get_bools(self.pi_events)
-        bg_entries = self.pi_events.loc[port2 & trial & on & valid_head, 'time_recording'].to_list()
+        bg_entries = self.pi_events.loc[trial & on & valid_head, 'time_recording'].to_list()
         bg_exits = self.pi_events.loc[port2 & head & off & valid_head, 'time_recording'].to_list()
         exp_entries = self.pi_events.loc[port1 & head & on & valid_head, 'time_recording'].to_list()
         exp_exits = self.pi_events.loc[port1 & head & off & valid_head, 'time_recording'].to_list()
@@ -128,7 +128,6 @@ class OneSession:
             excess_bg_exits[i] = self.pi_events.loc[port2 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
             excess_exp_entries[i] = self.pi_events.loc[port1 & head & on & is_in_trial & ~valid_head, 'time_recording'].to_list()
             excess_exp_exits[i] = self.pi_events.loc[port1 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
-        # todo: the valid head judgements are a little off for swapped port design. Need to fix that
         self.trial_df = pd.DataFrame({'trial': trials, 'phase': phase, 'rewards': rewards, 'licks': licks,
                                       'bg_entry': bg_entries, 'bg_exit': bg_exits,
                                       'exp_entry': exp_entries, 'exp_exit': exp_exits,
