@@ -6,6 +6,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
 
 mpl.rcParams['figure.dpi'] = 300
 
@@ -59,24 +60,26 @@ def figc_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
 
 def figd_example_session_heatmaps(zscore, reward_df, axes=None):
     if axes is None:
-        fig, ax = plt.subplots(1, 1, figsize=(1, 2))
+        fig, ax = plt.subplots(1, 1, figsize=(2, 2))
         return_handle = True
     else:
         fig = None
         return_handle = False
-    valid_df = reward_df[reward_df['time_in_port'].notna() & (reward_df['IRI_prior'] > 1)]
+    valid_df = reward_df[
+        reward_df['time_in_port'].notna() & (reward_df['IRI_prior'] > 1) & (reward_df['IRI_post'] >= 0.6)]
     sorted_df = valid_df.sort_values(by='time_in_port').reset_index(drop=True)
     bin_size_s = 0.05
 
     original_timestamps = zscore['time_recording'].values
     original_zscore = zscore['green_left'].values
     max_duration = sorted_df['IRI_post'].max()
+    cutoff_pre_reward = -0.5
     cutoff_post_reward = 2
-    uniform_time_vector = np.arange(0, cutoff_post_reward, bin_size_s)
+    uniform_time_vector = np.arange(cutoff_pre_reward, cutoff_post_reward, bin_size_s)
     heatmap_matrix = np.full((len(sorted_df), len(uniform_time_vector)), np.nan)
     # --- 3. Resample Each Trial and Place onto the Canvas ---
     for idx, row in sorted_df.iterrows():
-        start_time = row['reward_time']
+        start_time = row['reward_time'] + cutoff_pre_reward
         if pd.isna(row['next_reward_time']):
             end_time = row['exit_time']
         else:
@@ -107,36 +110,47 @@ def figd_example_session_heatmaps(zscore, reward_df, axes=None):
             fig.show()
             return fig, ax
 
+    nodes = [0.0, 0.5, 0.75, 1.0]
+    colors = ["blue", "black", "red", "yellow"]
+    custom_cmap = LinearSegmentedColormap.from_list("my_cmap", list(zip(nodes, colors)))
+
     heatmap_matrix = heatmap_matrix[np.sum(~np.isnan(heatmap_matrix), axis=1) > 10]
 
     # Use seaborn.heatmap which handles NaNs gracefully.
     sns.heatmap(
         heatmap_matrix,
         ax=ax,
-        cmap='viridis',
-        cbar=False,
+        cmap=custom_cmap,
+        center=0,
+        cbar=True,
         yticklabels=False
     )
 
+    # adjust the colorbar tick labels
+    cbar_ax = fig.axes[-1]
+    # cbar_ax.yaxis.label.set_size(4)
+    cbar_ax.tick_params(width=0.2, length=0.5, labelsize=4)
+
     # Customize the x-axis ticks to show time in seconds
-    xtick_positions = np.linspace(0, heatmap_matrix.shape[1], 5)
-    xtick_labels = np.round(np.linspace(0, cutoff_post_reward, 5), 1)
-    ytick_positions = np.arange(0, heatmap_matrix.shape[0], 10)
-    ytick_labels = np.arange(0, heatmap_matrix.shape[0], 10)
+    xtick_positions = np.linspace(0, heatmap_matrix.shape[1], 6)
+    xtick_labels = np.round(np.linspace(cutoff_pre_reward, cutoff_post_reward, 6), 1)
+    ytick_positions = np.arange(0, heatmap_matrix.shape[0], 30)
+    ytick_labels = np.arange(0, heatmap_matrix.shape[0], 30)
     ax.set_xticks(xtick_positions)
-    ax.set_xticklabels(xtick_labels, fontsize=2)
+    ax.set_xticklabels(xtick_labels, fontsize=4, rotation=0)
     ax.set_yticks(ytick_positions)
-    ax.set_yticklabels(ytick_labels, fontsize=2)
+    ax.set_yticklabels(ytick_labels, fontsize=4)
     ax.tick_params(axis='x', width=0.2, length=0.5)
     ax.tick_params(axis='y', width=0.2, length=0.5)
-    ax.set_xlabel('Time from Reward (s)', fontsize=2)
-    ax.set_ylabel('Trial', fontsize=2)
-    ax.set_title('Example Session', fontsize=3)
+    ax.set_xlabel('Time from Reward (s)', fontsize=4)
+    ax.set_ylabel('Trial', fontsize=4)
     plt.subplots_adjust(left=0, right=0.01, bottom=0, top=0.01)
     plt.tight_layout()
     if return_handle:
         fig.show()
         return fig, ax
+
+
 # --- helper functions ---
 def draw_vertical_lines(ax, x_npy, ymin=0, ymax=1, color='r', alpha=1, linestyle='-', linewidth=1):
     for x_value in x_npy:
@@ -158,9 +172,12 @@ def main():
     animal_str = 'SZ036'
     session_id = 9
     session_name = '2024-01-08T13_52'
-    zscore = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name, file_format='parquet')
-    trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name, file_format='parquet')
-    reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name, file_format='parquet')
+    zscore = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
+                                                file_format='parquet')
+    trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
+                                                  file_format='parquet')
+    reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
+                                                   file_format='parquet')
     # --- end of data preparation ---
     figd_example_session_heatmaps(zscore, reward_df, axes=None)
     figc_example_trial_1d_traces(zscore, trial_df, example_trial_id=32, ax=None)
