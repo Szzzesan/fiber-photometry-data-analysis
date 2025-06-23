@@ -1475,14 +1475,14 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('RK009', 1, include_branch='both', port_swap=1)
+    test_session = OneSession('RK010', 3, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
-    test_session.calculate_dFF0(plot=1, plot_middle_step=0, save=0)
+    test_session.calculate_dFF0(plot=1, plot_middle_step=1, save=0)
     # test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
     # test_session.save_pi_events(format='parquet')
-    test_session.construct_trial_df()
+    # test_session.construct_trial_df()
     # test_session.save_trial_df(format='parquet')
     # test_session.construct_expreward_interval_df()
     # test_session.save_expreward_df(format='parquet')
@@ -1496,9 +1496,9 @@ if __name__ == '__main__':
     # test_session.plot_bg_heatmaps(save=0)
     # test_session.actual_leave_vs_adjusted_optimal(save=0)
     test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
-    # df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
-    #                                                          block_split=False,
-    #                                                          plot_histograms=0, plot_linecharts=1)
+    df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
+                                                             block_split=False,
+                                                             plot_histograms=0, plot_linecharts=1)
     test_session.visualize_DA_vs_NRI_IRI(plot_scatters=0, plot_histograms=0)
     DA_in_block_transition = test_session.bg_port_in_block_reversal(plot_single_traes=0, plot_average=0)
 
