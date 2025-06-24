@@ -1,11 +1,16 @@
-import numpy as np
-import time
+from matplotlib import gridspec
+from matplotlib.transforms import ScaledTranslation
+
 import data_loader
 import helper
+
+import numpy as np
+import pandas as pd
+import time
+
+import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.gridspec import GridSpec
 
@@ -36,6 +41,7 @@ def figc_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(8, 2))
         return_handle = True
+        ax.set_title(f'Example trial: {example_trial_id}')
     else:
         fig = None
         return_handle = False
@@ -46,13 +52,12 @@ def figc_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     draw_vertical_lines(ax, exits, color='g', linestyle='--')
     draw_vertical_lines(ax, rewards, color='r')
     ax.plot(relative_time, DA_trace_to_plot, color='black')
-    ax.set_xlim([-1, 21])
-    ax.set_xticks(np.arange(0, 20, 2.5))
+    ax.set_xlim([-1, 15])
+    ax.set_xticks(np.arange(0, 15.5, 2.5))
     ax.set_xlabel('Time since Trial Starts (sec)')
     ax.set_ylabel('DA (z-score)')
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
-    ax.set_title(f'Example trial: {example_trial_id}')
     plt.tight_layout()
     if return_handle:
         fig.show()
@@ -62,7 +67,7 @@ def figc_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
 def figd_example_session_heatmaps(zscore, reward_df, axes=None):
     if axes is None:
         fig = plt.figure(figsize=(2, 2))
-        gs = GridSpec(1, 3, width_ratios=[0.5, 12, 1], wspace=0.05)
+        gs = GridSpec(1, 3, width_ratios=[0.5, 20, 1], wspace=0.05)
         ax_bars = fig.add_subplot(gs[0, 0])
         ax_heatmap = fig.add_subplot(gs[0, 1])
         ax_cbar = fig.add_subplot(gs[0, 2])
@@ -70,6 +75,9 @@ def figd_example_session_heatmaps(zscore, reward_df, axes=None):
     else:
         fig = None
         return_handle = False
+        ax_bars = axes[0]
+        ax_heatmap = axes[1]
+        ax_cbar = axes[2]
     valid_df = reward_df[
         reward_df['time_in_port'].notna() & (reward_df['IRI_prior'] > 1) & (reward_df['IRI_post'] >= 0.6)]
     # Categorize 'time_in_port' for the bar plot
@@ -128,10 +136,10 @@ def figd_example_session_heatmaps(zscore, reward_df, axes=None):
     category_codes = sorted_df['time_cat_code'].values
 
     # Plot the category bars on the left axis (ax_bars)
-    category_matrix = category_codes[:, np.newaxis] # Reshape for heatmap
+    category_matrix = category_codes[:, np.newaxis]  # Reshape for heatmap
     # Use 'Reds_r' to go from dark red (low NRIs) to light red (high NRIs)
     sns.heatmap(category_matrix, ax=ax_bars, cmap='Reds_r', cbar=False, xticklabels=False, yticklabels=False)
-    ax_bars.set_ylabel(None) # Remove any potential labels
+    ax_bars.set_ylabel(None)  # Remove any potential labels
 
     # Plot main heatmap
     sns.heatmap(
@@ -144,15 +152,15 @@ def figd_example_session_heatmaps(zscore, reward_df, axes=None):
         cbar_ax=ax_cbar,
     )
 
-    ax_cbar.tick_params(width=0.3, length=0.8, labelsize=4, direction='in', color='white')
+    # ax_cbar.tick_params(width=0.3, length=0.8, labelsize=4, direction='in', color='white')
+    ax_cbar.tick_params(direction='in', color='white')
 
     # Customize the x-axis ticks to show time in seconds
     xtick_positions = np.linspace(0, heatmap_matrix.shape[1], 6)
     xtick_labels = np.round(np.linspace(cutoff_pre_reward, cutoff_post_reward, 6), 1)
     ax_heatmap.set_xticks(xtick_positions)
-    ax_heatmap.set_xticklabels(xtick_labels, fontsize=4, rotation=0)
-    ax_heatmap.tick_params(axis='x', width=0.2, length=0.5)
-    ax_heatmap.set_xlabel('Time from Reward (s)', fontsize=4)
+    ax_heatmap.set_xticklabels(xtick_labels, rotation=0)
+    ax_heatmap.set_xlabel('Time from Reward (s)')
     # ytick_positions = np.arange(0, heatmap_matrix.shape[0], 30)
     # ytick_labels = np.arange(0, heatmap_matrix.shape[0], 30)
     # ax_heatmap.set_yticks(ytick_positions)
@@ -160,11 +168,109 @@ def figd_example_session_heatmaps(zscore, reward_df, axes=None):
     # ax_heatmap.tick_params(axis='y', width=0.2, length=0.5)
     # ax_heatmap.set_ylabel('Trial', fontsize=4)
     ax_heatmap.set_ylabel(None)
-    # plt.subplots_adjust(left=0, right=0.01, bottom=0, top=0.01)
-    # plt.tight_layout()
     if return_handle:
+        fig.tight_layout()
         fig.show()
         return fig, ax_heatmap
+
+
+def setup_axes():
+    fig_size = (12, 12)  # (width, height) in inches
+    rows, cols = fig_size[1] * 10, fig_size[0] * 10
+
+    row_1 = [8, 1, 2]
+    row_2 = [1.5, 18, 2, 18, 1.5, 18, 2, 18]
+    row_3 = [2, 2, 1]
+    row_4 = [3, 2]
+    col_1 = [1, 2, 2, 3]
+
+    row_1_margins = [4, 6]
+    row_2_margins = [1, 1, 4, 6, 1, 1, 4]
+    row_3_margins = [6, 6]
+    row_4_margins = [10]
+    col_1_margins = [8, 8, 8]
+
+    row_1_splits = [int((cols - np.sum(row_1_margins)) * h / sum(row_1)) for h in row_1]
+    row_2_splits = [int((cols - np.sum(row_2_margins)) * h / sum(row_2)) for h in row_2]
+    row_3_splits = [int((cols - np.sum(row_3_margins)) * h / sum(row_3)) for h in row_3]
+    row_4_splits = [int((cols - np.sum(row_4_margins)) * h / sum(row_4)) for h in row_4]
+    col_1_splits = [int((rows - np.sum(col_1_margins)) * h / sum(col_1)) for h in col_1]
+
+    row_1_splits = [val for pair in zip(row_1_splits, row_1_margins + [0]) for val in pair][:-1]
+    row_2_splits = [val for pair in zip(row_2_splits, row_2_margins + [0]) for val in pair][:-1]
+    row_3_splits = [val for pair in zip(row_3_splits, row_3_margins + [0]) for val in pair][:-1]
+    row_4_splits = [val for pair in zip(row_4_splits, row_4_margins + [0]) for val in pair][:-1]
+    col_1_splits = [val for pair in zip(col_1_splits, col_1_margins + [0]) for val in pair][:-1]
+
+    row_1_splits = np.cumsum(row_1_splits)
+    row_2_splits = np.cumsum(row_2_splits)
+    row_3_splits = np.cumsum(row_3_splits)
+    row_4_splits = np.cumsum(row_4_splits)
+    col_1_splits = np.cumsum(col_1_splits)
+
+    row_1_splits[-1] = cols
+    row_2_splits[-1] = cols
+    row_3_splits[-1] = cols
+    row_4_splits[-1] = cols
+    col_1_splits += rows - col_1_splits[-1]
+
+    fig = plt.figure(figsize=fig_size)
+    gs = gridspec.GridSpec(rows, cols, figure=fig)
+    axes = [
+        fig.add_subplot(gs[1:col_1_splits[0],
+                        :row_1_splits[0]]),  # example trial plot
+        fig.add_subplot(gs[1:col_1_splits[0],
+                        row_1_splits[1]:row_1_splits[2]]),  # example trial legend
+        fig.add_subplot(gs[:col_1_splits[0],
+                        row_1_splits[-2]:]),  # recording locations plot
+
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2],
+                        :row_2_splits[0]]),  # category bar for heatmap 1
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2],
+                        row_2_splits[1]:row_2_splits[2]]),  # heatmap 1
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2],
+                        row_2_splits[3]:row_2_splits[4]]),  # colorbar for heatmap 1
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2],
+                        row_2_splits[5]:row_2_splits[6]]),  # transient averaged from heatmap 1
+
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2],
+                        row_2_splits[7]:row_2_splits[8]]),  # category bar for heatmap 2
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2],
+                        row_2_splits[9]:row_2_splits[10]]),  # heatmap 2
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2],
+                        row_2_splits[11]:row_2_splits[12]]),  # colorbar for heatmap 2
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2],
+                        row_2_splits[13]:row_2_splits[14]]),  # transient averaged from heatmap 2
+
+        fig.add_subplot(gs[col_1_splits[3]:col_1_splits[4],
+                        :row_3_splits[0]]),  # DA vs. NRI for all animals
+        fig.add_subplot(gs[col_1_splits[3]:col_1_splits[4],
+                        row_3_splits[1]:row_3_splits[2]]),  # DA vs. NRI but split by blocks from all animals
+        fig.add_subplot(gs[col_1_splits[3]:col_1_splits[4],
+                        row_3_splits[3]:row_3_splits[4]]),  # DA vs. IRI
+
+        fig.add_subplot(gs[col_1_splits[5]:col_1_splits[6],
+                        :row_4_splits[0]]),  # heatmap of DA vs. NRI vs. IRI and split by block
+        fig.add_subplot(gs[col_1_splits[5]:col_1_splits[6],
+                        row_4_splits[1]:row_4_splits[2]]),  # scatters of predicted DA vs. real DA with fitting
+
+    ]
+
+    # # remove right and top spines
+    # for ax in axes:
+    #     ax.spines['right'].set_visible(False)
+    #     ax.spines['top'].set_visible(False)
+
+    lettering = 'abcdefghijklmnopqrstuvwxyz'
+    axes_to_letter = [0, 2, 3, 7, 11, 12, 13, 14, 15]
+    for i, ax in enumerate(axes_to_letter):
+        axes[ax].text(
+            0.0, 1.0, lettering[i], transform=(
+                    axes[ax].transAxes + ScaledTranslation(-20 / 72, +7 / 72, fig.dpi_scale_trans)),
+            fontsize='large', va='bottom', fontfamily='sans-serif', weight='bold')
+
+    axes = np.array(axes)
+    return axes
 
 
 # --- helper functions ---
@@ -184,19 +290,41 @@ def main():
     # '2024-01-12T10_58': trial 6
     # '2024-01-13T20_50': trial 38, 39, 43
     # --- example trial log ends ---
+
     # --- data preparation ---
     animal_str = 'SZ036'
-    # session_id = 9
-    session_name = '2024-01-04T15_49'
-    zscore = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
-                                                file_format='parquet')
+    session_name = '2024-01-08T13_52'
+    zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
+                                                              session_long_name=session_name,
+                                                              file_format='parquet')
     trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
                                                   file_format='parquet')
+
+    animal_str = 'SZ036'
+    session_name = '2024-01-04T15_49'
+    zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
+                                                        file_format='parquet')
     reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
                                                    file_format='parquet')
     # --- end of data preparation ---
-    figd_example_session_heatmaps(zscore, reward_df, axes=None)
-    figc_example_trial_1d_traces(zscore, trial_df, example_trial_id=32, ax=None)
+
+    # --- set up axes and add figures to axes ---
+    axes = setup_axes()
+
+    tic = time.time()
+    figc_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=axes[0])
+    print(f'figc_example_trial took {time.time() - tic:.2f} seconds')
+
+    tic = time.time()
+    figd_example_session_heatmaps(zscore_heatmap, reward_df, axes=axes[3:6])
+    print(f'figd_example_session_heatmaps took {time.time() - tic:.2f} seconds')
+
+    plt.subplots_adjust(hspace=0, wspace=0)
+    plt.show()
+    print('hello')
+    # --- end of adding figures to axes
+
+
 
     # --- go through all the trials in one session when looking for good trials ---
     # for trial_id in trial_df['trial'].values:
