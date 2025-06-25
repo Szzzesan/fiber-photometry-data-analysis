@@ -12,7 +12,7 @@ import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.gridspec import GridSpec
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
 
 mpl.rcParams['figure.dpi'] = 300
@@ -104,12 +104,15 @@ def figa_example_trial_legend(ax=None):
         return ax
 
 def figc_example_session_heatmaps(zscore, reward_df, axes=None):
+    # --- 1. Prepare axes/grids ---
     if axes is None:
-        fig = plt.figure(figsize=(2, 2))
-        gs = GridSpec(1, 3, width_ratios=[0.5, 20, 1], wspace=0.05)
-        ax_bars = fig.add_subplot(gs[0, 0])
-        ax_heatmap = fig.add_subplot(gs[0, 1])
-        ax_cbar = fig.add_subplot(gs[0, 2])
+        fig = plt.figure(figsize=(6, 3))
+        gs_outer = GridSpec(1, 2, width_ratios=[21.5, 20], wspace=0.3)
+        gs_inner = GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_outer[0], width_ratios=[0.5, 20, 1], wspace=0.05)
+        ax_bars = fig.add_subplot(gs_inner[0, 0])
+        ax_heatmap = fig.add_subplot(gs_inner[0, 1])
+        ax_cbar = fig.add_subplot(gs_inner[0, 2])
+        ax_mean = fig.add_subplot(gs_outer[0, 1])
         return_handle = True
     else:
         fig = None
@@ -117,13 +120,16 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
         ax_bars = axes[0]
         ax_heatmap = axes[1]
         ax_cbar = axes[2]
+        ax_mean = axes[3]
+
+    # --- 2. Data preparation ---
     valid_df = reward_df[
         reward_df['time_in_port'].notna() & (reward_df['IRI_prior'] > 1) & (reward_df['IRI_post'] >= 0.6)]
     # Categorize 'time_in_port' for the bar plot
-    bins = [0, 3, 6, 9, 12, np.inf]
+    bins = [0, 4, 8, 12, np.inf]
+    bin_labels = ['0-4 s', '4-8 s', '8-12 s', '12+ s']
     # Using labels=False gives integer codes (0, 1, 2, 3, 4) perfect for plotting
     valid_df['time_cat_code'] = pd.cut(valid_df['time_in_port'], bins=bins, labels=False, right=False)
-
     sorted_df = valid_df.sort_values(by='time_in_port').reset_index(drop=True)
     bin_size_s = 0.05
 
@@ -132,8 +138,9 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
     max_duration = sorted_df['IRI_post'].max()
     cutoff_pre_reward = -0.5
     cutoff_post_reward = 2
-    uniform_time_vector = np.arange(cutoff_pre_reward, cutoff_post_reward, bin_size_s)
+    uniform_time_vector = np.arange(cutoff_pre_reward, cutoff_post_reward + bin_size_s, bin_size_s)
     heatmap_matrix = np.full((len(sorted_df), len(uniform_time_vector)), np.nan)
+
     # --- 3. Resample Each Trial and Place onto the Canvas ---
     for idx, row in sorted_df.iterrows():
         start_time = row['reward_time'] + cutoff_pre_reward
@@ -159,7 +166,27 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
             heatmap_matrix[idx, :len(resampled_zscores)] = resampled_zscores
         else:
             heatmap_matrix[idx, :] = resampled_zscores[:len(uniform_time_vector)]
-    # --- 4. Plotting ---
+
+    # --- 4. Calculate mean and sems ---
+    category_codes = sorted_df['time_cat_code'].values
+    stats = {}
+    for i, label in enumerate(bin_labels):
+        sub_matrix = heatmap_matrix[category_codes == i]
+        if sub_matrix.shape[0] > 0:
+            mean_trace = np.nanmean(sub_matrix, axis=0)
+            std_trace = np.nanstd(sub_matrix, axis=0)
+            n_samples = np.sum(~np.isnan(sub_matrix), axis=0)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                sem_trace = std_trace / np.sqrt(n_samples)
+                sem_trace[np.isnan(sem_trace)] = 0
+            stats[label] = {
+                'mean': mean_trace, 'sem': sem_trace,
+                'upper_bound': mean_trace + sem_trace,
+                'lower_bound': mean_trace - sem_trace,
+                'n_trials': sub_matrix.shape[0]
+            }
+
+    # --- 5. Plotting ---
     if np.all(np.isnan(heatmap_matrix)):
         print("No valid epochs were found to plot.")
         ax_heatmap.text(0.5, 0.5, 'No Data', ha='center', va='center')
@@ -170,9 +197,6 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
     nodes = [0.0, 0.5, 0.75, 1.0]
     colors = ["blue", "black", "red", "yellow"]
     custom_cmap = LinearSegmentedColormap.from_list("my_cmap", list(zip(nodes, colors)))
-
-    # heatmap_matrix = heatmap_matrix[np.sum(~np.isnan(heatmap_matrix), axis=1) > 10]
-    category_codes = sorted_df['time_cat_code'].values
 
     # Plot the category bars on the left axis (ax_bars)
     category_matrix = category_codes[:, np.newaxis]  # Reshape for heatmap
@@ -195,18 +219,35 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
     ax_cbar.tick_params(direction='in', color='white')
 
     # Customize the x-axis ticks to show time in seconds
-    xtick_positions = np.linspace(0, heatmap_matrix.shape[1], 6)
-    xtick_labels = np.round(np.linspace(cutoff_pre_reward, cutoff_post_reward, 6), 1)
+    xtick_labels = [cutoff_pre_reward, 0, 1, cutoff_post_reward]
+    xtick_positions = [
+        0,                                                  # Start position
+        np.abs(uniform_time_vector - 0).argmin(),           # Position of zero
+        np.abs(uniform_time_vector - 0).argmin() + int(1/bin_size_s), # Position of one
+        len(uniform_time_vector) - 1                        # End position
+    ]
+
     ax_heatmap.set_xticks(xtick_positions)
     ax_heatmap.set_xticklabels(xtick_labels, rotation=0)
     ax_heatmap.set_xlabel('Time from Reward (s)')
-    # ytick_positions = np.arange(0, heatmap_matrix.shape[0], 30)
-    # ytick_labels = np.arange(0, heatmap_matrix.shape[0], 30)
-    # ax_heatmap.set_yticks(ytick_positions)
-    # ax_heatmap.set_yticklabels(ytick_labels, fontsize=4)
-    # ax_heatmap.tick_params(axis='y', width=0.2, length=0.5)
-    # ax_heatmap.set_ylabel('Trial', fontsize=4)
     ax_heatmap.set_ylabel(None)
+
+    # plot mean traces and their error bands from each category
+    cat_num = len(stats)
+    palette = list(reversed(sns.color_palette("Reds", n_colors=cat_num)))
+    for i, label in enumerate(bin_labels[:-1]):
+        lower_bound = stats[label]['lower_bound']
+        upper_bound = stats[label]['upper_bound']
+        ax_mean.plot(uniform_time_vector, stats[label]['mean'], label=label, color=palette[i])
+        ax_mean.fill_between(uniform_time_vector, lower_bound, upper_bound, color=palette[i], alpha=0.2)
+        ax_mean.spines['top'].set_visible(False)
+        ax_mean.spines['right'].set_visible(False)
+        # ax_mean.set_xticks(xtick_positions)
+        ax_mean.set_xlim([-0.5, 2])
+        ax_mean.set_xticks(xtick_labels)
+        ax_mean.set_xlabel('Time from Reward (s)')
+        ax_mean.set_ylabel('DA (z-score)')
+        ax_mean.legend(title='Time in Port', fontsize='small')
     if return_handle:
         fig.tight_layout()
         fig.show()
@@ -221,13 +262,13 @@ def setup_axes():
     row_2 = [1.5, 18, 2, 18, 1.5, 18, 2, 18]
     row_3 = [2, 2, 1]
     row_4 = [3, 2]
-    col_1 = [1, 2, 2, 3]
+    col_1 = [1, 2, 3, 3]
 
     row_1_margins = [4, 6]
-    row_2_margins = [1, 1, 4, 6, 1, 1, 4]
+    row_2_margins = [1, 1, 8, 4, 1, 1, 8]
     row_3_margins = [6, 6]
     row_4_margins = [10]
-    col_1_margins = [8, 8, 8]
+    col_1_margins = [8, 10, 8]
 
     row_1_splits = [int((cols - np.sum(row_1_margins)) * h / sum(row_1)) for h in row_1]
     row_2_splits = [int((cols - np.sum(row_2_margins)) * h / sum(row_2)) for h in row_2]
@@ -356,7 +397,7 @@ def main():
     print(f'figa_example_trial took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    figc_example_session_heatmaps(zscore_heatmap, reward_df, axes=axes[3:6])
+    figc_example_session_heatmaps(zscore_heatmap, reward_df, axes=axes[3:7])
     print(f'figd_example_session_heatmaps took {time.time() - tic:.2f} seconds')
 
     plt.subplots_adjust(hspace=0, wspace=0)
@@ -375,3 +416,10 @@ def main():
 
 if __name__ == '__main__':
     main()
+    # animal_str = 'SZ036'
+    # session_name = '2024-01-04T15_49'
+    # zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
+    #                                                     file_format='parquet')
+    # reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
+    #                                                file_format='parquet')
+    # figc_example_session_heatmaps(zscore_heatmap, reward_df, axes=None)
