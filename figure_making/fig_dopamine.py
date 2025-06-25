@@ -13,12 +13,13 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.gridspec import GridSpec
+import matplotlib.patches as mpatches
 
 mpl.rcParams['figure.dpi'] = 300
 
 
 # --- First plotting method starts here ---
-def figc_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
+def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     assert example_trial_id in trial_df[
         'trial'].values, f"example_trial_id {example_trial_id} not found in trial_df['trial']"
     row_id_bool = trial_df['trial'] == example_trial_id
@@ -45,8 +46,8 @@ def figc_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     else:
         fig = None
         return_handle = False
-    ax.axvspan(0, bg_exit, ymin=0.9, ymax=1, color='skyblue', alpha=0.6, label='Context Port')
-    ax.axvspan(exp_entry, exp_exit, ymin=0.9, ymax=1, color='lightcoral', alpha=0.6, label='Investment Port')
+    ax.axvspan(0, bg_exit, ymin=0.89, ymax=1, facecolor='skyblue', alpha=0.6, edgecolor='none', label='Context Port')
+    ax.axvspan(exp_entry, exp_exit, ymin=0.89, ymax=1, facecolor='lightcoral', alpha=0.6, edgecolor='none', label='Investment Port')
     draw_vertical_lines(ax, licks, ymin=0.9, ymax=1, color='grey', alpha=0.1)
     draw_vertical_lines(ax, entries, color='b', linestyle='--')
     draw_vertical_lines(ax, exits, color='g', linestyle='--')
@@ -54,7 +55,7 @@ def figc_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     ax.plot(relative_time, DA_trace_to_plot, color='black')
     ax.set_xlim([-1, 15])
     ax.set_xticks(np.arange(0, 15.5, 2.5))
-    ax.set_xlabel('Time since Trial Starts (sec)')
+    ax.set_xlabel('Time since Trial Starts (s)')
     ax.set_ylabel('DA (z-score)')
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
@@ -63,8 +64,46 @@ def figc_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
         fig.show()
         return fig, ax
 
+def figa_example_trial_legend(ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(2, 1))
+        show = True
+    else:
+        show = False
+    from matplotlib import lines
 
-def figd_example_session_heatmaps(zscore, reward_df, axes=None):
+    lines_for_legend = [
+        lines.Line2D([0, 0], [0, 10], color='b', linestyle=(0, (3, 1.5)), label='Entry'),
+        lines.Line2D([0, 0], [0, 10], color='r', linestyle='solid', label='Reward'),
+        lines.Line2D([0, 0], [0, 10], color='g', linestyle=(0, (3, 1.5)), label='Exit'),
+        lines.Line2D([0, 0], [0, 10], color='grey', linestyle='solid', label='Lick Times'),
+        # lines.Line2D([0, 1], [0, 0], color='k', linestyle='solid', label='DA (z-score)'),
+    ]
+
+    context_port_patch = mpatches.Patch(facecolor='skyblue', alpha=0.6, edgecolor='none', label='Context Port')
+    investment_port_patch = mpatches.Patch(facecolor='lightcoral', alpha=0.6, edgecolor='none', label='Investment Port')
+
+    all_handles =  lines_for_legend[0:4] + [context_port_patch, investment_port_patch]
+    legend = ax.legend(handles=all_handles, loc='center', prop={'size': 8}, frameon=False)
+    # handler_map={plt.Line2D: plotting_utils.HandlerMiniatureLine()})
+
+    # make the lines in the legend vertical
+    legend.legendHandles[0].set_data([8, 8], [-1, 8])
+    legend.legendHandles[1].set_data([8, 8], [0, 6])
+    legend.legendHandles[2].set_data([8, 8], [-1, 8])
+    legend.legendHandles[3].set_data([8, 8], [0, 6])
+    legend.legendHandles[3].set_linewidth(1)
+    # legend.legendHandles[6].set_data([2, 14], [3, 3])
+
+    ax.axis('off')
+
+    if show:
+        plt.tight_layout()
+        plt.show()
+    else:
+        return ax
+
+def figc_example_session_heatmaps(zscore, reward_df, axes=None):
     if axes is None:
         fig = plt.figure(figsize=(2, 2))
         gs = GridSpec(1, 3, width_ratios=[0.5, 20, 1], wspace=0.05)
@@ -312,11 +351,12 @@ def main():
     axes = setup_axes()
 
     tic = time.time()
-    figc_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=axes[0])
-    print(f'figc_example_trial took {time.time() - tic:.2f} seconds')
+    figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=axes[0])
+    figa_example_trial_legend(ax=axes[1])
+    print(f'figa_example_trial took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    figd_example_session_heatmaps(zscore_heatmap, reward_df, axes=axes[3:6])
+    figc_example_session_heatmaps(zscore_heatmap, reward_df, axes=axes[3:6])
     print(f'figd_example_session_heatmaps took {time.time() - tic:.2f} seconds')
 
     plt.subplots_adjust(hspace=0, wspace=0)
