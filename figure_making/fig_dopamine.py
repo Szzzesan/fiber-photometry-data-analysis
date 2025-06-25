@@ -14,9 +14,21 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
+import matplotlib.ticker as mticker
 
 mpl.rcParams['figure.dpi'] = 300
-
+# # Using a dictionary is a clean way to update multiple parameters
+# params = {
+#     'axes.labelsize': 9,
+#     'axes.labelweight': 'semibold',  # Set x and y labels to bold
+#     # 'axes.titlesize': 10,
+#     # 'axes.titleweight': 'bold',  # Set plot titles to bold
+#     'xtick.labelsize': 8,
+#     'ytick.labelsize': 8,
+#     'font.weight': 'semibold',       # Set other font elements like tick labels to bold
+#     'legend.fontsize': 7,
+# }
+# plt.rcParams.update(params)
 
 # --- First plotting method starts here ---
 def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
@@ -58,6 +70,7 @@ def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     ax.set_xticks(np.arange(0, 15.5, 2.5))
     ax.set_xlabel('Time since Trial Starts (s)')
     ax.set_ylabel('DA (z-score)')
+    ax.set_title('Example Trial')
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     plt.tight_layout()
@@ -86,7 +99,7 @@ def figa_example_trial_legend(ax=None):
     investment_port_patch = mpatches.Patch(facecolor='lightcoral', alpha=0.6, edgecolor='none', label='Investment Port')
 
     all_handles = lines_for_legend[0:4] + [context_port_patch, investment_port_patch]
-    legend = ax.legend(handles=all_handles, loc='center', prop={'size': 8}, frameon=False)
+    legend = ax.legend(handles=all_handles, loc='center', prop={'size': 7.5}, frameon=False)
     # handler_map={plt.Line2D: plotting_utils.HandlerMiniatureLine()})
 
     # make the lines in the legend vertical
@@ -261,13 +274,14 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
     )
 
     # ax_cbar.tick_params(width=0.3, length=0.8, labelsize=4, direction='in', color='white')
-    ax_cbar.tick_params(direction='in', color='white')
+    ax_cbar.set_title('DA\n(z-score)', fontsize='small', pad=0)
+    ax_cbar.tick_params(direction='in', color='white', labelsize='small')
 
     # Customize the x-axis ticks to show time in seconds
     cutoff_pre_reward = round(time_vector[0], 1)
-    cutoff_post_reward = round(time_vector[-1], 2)
+    cutoff_post_reward = round(time_vector[-1], 1)
     bin_size_s = round((time_vector[-1] - time_vector[0]) / (len(time_vector) - 1), 2)
-    xtick_labels = [cutoff_pre_reward, 0, 1, cutoff_post_reward]
+    xtick_labels = [cutoff_pre_reward, 0, 1, int(cutoff_post_reward)]
     xtick_positions = [
         0,  # Start position
         np.abs(time_vector - 0).argmin(),  # Position of zero
@@ -298,9 +312,12 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
     # ax_mean.set_xticks(xtick_positions)
     ax_mean.set_xlim([cutoff_pre_reward, cutoff_post_reward])
     ax_mean.set_xticks(xtick_labels)
-    # ax_mean.set_xlabel('Time from Reward (s)')
-    ax_mean.set_ylabel('DA (z-score)', labelpad=-6)
-    ax_mean.legend(title=legend_title, fontsize='x-small', handlelength=1, borderpad=0.4)
+    ax_mean.xaxis.set_major_formatter(mticker.FormatStrFormatter('%g'))
+    ax_mean.set_ylabel('Mean DA (z-score)', labelpad=-6, y=0.55)
+    ax_mean.legend(title=legend_title,
+                   prop={'weight': 'normal', 'size': 'small'},
+                   title_fontproperties={'weight': 'normal', 'size': 'small'},
+                   handlelength=1, borderpad=0.4)
 
     for ax in [ax_heatmap, ax_mean]:
         ax.set_xlabel('Time from Reward (s)')
@@ -339,16 +356,16 @@ def setup_axes():
     rows, cols = fig_size[1] * 10, fig_size[0] * 10
 
     row_1 = [8, 1, 2]
-    row_2 = [1.5, 18, 2, 18, 1.5, 18, 2, 18]
+    row_2 = [1, 15, 2, 15, 1, 15, 2, 15]
     row_3 = [2, 2, 1]
     row_4 = [3, 2]
     col_1 = [1, 2, 3, 3]
 
     row_1_margins = [4, 6]
-    row_2_margins = [1, 1, 8, 4, 1, 1, 8]
+    row_2_margins = [1, 1, 8, 6, 1, 1, 8]
     row_3_margins = [6, 6]
     row_4_margins = [10]
-    col_1_margins = [8, 10, 8]
+    col_1_margins = [10, 10, 8]
 
     row_1_splits = [int((cols - np.sum(row_1_margins)) * h / sum(row_1)) for h in row_1]
     row_2_splits = [int((cols - np.sum(row_2_margins)) * h / sum(row_2)) for h in row_2]
@@ -455,13 +472,10 @@ def main():
     # animal SZ036
     # '2024-01-03T16_13'
     # '2024-01-04T11_40'
-    # '2024-01-12T18_23'
     # animal SZ037
     # '2024-01-04T12_45'
     # '2024-01-12T10_36'
     # animal SZ042
-    # '2023-12-07T14_47'
-    # '2023-12-27T17_02'
     # '2023-12-28T16_34'
     # '2023-12-30T21_48'
     # --- example trial log ends ---
@@ -497,9 +511,9 @@ def main():
 
     tic = time.time()
     figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=axes[7:11])
-    print(f'figc_example_session_heatmap_split_by_NRI took {time.time() - tic:.2f} seconds')
+    print(f'figd_example_session_heatmap_split_by_block took {time.time() - tic:.2f} seconds')
 
-    plt.subplots_adjust(hspace=0, wspace=0)
+    plt.subplots_adjust(hspace=0, wspace=0) # left=0.07, right=0.98, bottom=0.15, top=0.9
     plt.show()
     print('hello')
     # --- end of adding figures to axes
