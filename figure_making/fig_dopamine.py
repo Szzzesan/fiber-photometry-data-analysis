@@ -11,7 +11,7 @@ import time
 import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
 
@@ -47,7 +47,8 @@ def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
         fig = None
         return_handle = False
     ax.axvspan(0, bg_exit, ymin=0.89, ymax=1, facecolor='skyblue', alpha=0.6, edgecolor='none', label='Context Port')
-    ax.axvspan(exp_entry, exp_exit, ymin=0.89, ymax=1, facecolor='lightcoral', alpha=0.6, edgecolor='none', label='Investment Port')
+    ax.axvspan(exp_entry, exp_exit, ymin=0.89, ymax=1, facecolor='lightcoral', alpha=0.6, edgecolor='none',
+               label='Investment Port')
     draw_vertical_lines(ax, licks, ymin=0.9, ymax=1, color='grey', alpha=0.1)
     draw_vertical_lines(ax, entries, color='b', linestyle='--')
     draw_vertical_lines(ax, exits, color='g', linestyle='--')
@@ -63,6 +64,7 @@ def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     if return_handle:
         fig.show()
         return fig, ax
+
 
 def figa_example_trial_legend(ax=None):
     if ax is None:
@@ -83,7 +85,7 @@ def figa_example_trial_legend(ax=None):
     context_port_patch = mpatches.Patch(facecolor='skyblue', alpha=0.6, edgecolor='none', label='Context Port')
     investment_port_patch = mpatches.Patch(facecolor='lightcoral', alpha=0.6, edgecolor='none', label='Investment Port')
 
-    all_handles =  lines_for_legend[0:4] + [context_port_patch, investment_port_patch]
+    all_handles = lines_for_legend[0:4] + [context_port_patch, investment_port_patch]
     legend = ax.legend(handles=all_handles, loc='center', prop={'size': 8}, frameon=False)
     # handler_map={plt.Line2D: plotting_utils.HandlerMiniatureLine()})
 
@@ -103,45 +105,49 @@ def figa_example_trial_legend(ax=None):
     else:
         return ax
 
-def figc_example_session_heatmaps(zscore, reward_df, axes=None):
-    # --- 1. Prepare axes/grids ---
-    if axes is None:
-        fig = plt.figure(figsize=(6, 3))
-        gs_outer = GridSpec(1, 2, width_ratios=[21.5, 20], wspace=0.3)
-        gs_inner = GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_outer[0], width_ratios=[0.5, 20, 1], wspace=0.05)
-        ax_bars = fig.add_subplot(gs_inner[0, 0])
-        ax_heatmap = fig.add_subplot(gs_inner[0, 1])
-        ax_cbar = fig.add_subplot(gs_inner[0, 2])
-        ax_mean = fig.add_subplot(gs_outer[0, 1])
-        return_handle = True
-    else:
-        fig = None
-        return_handle = False
-        ax_bars = axes[0]
-        ax_heatmap = axes[1]
-        ax_cbar = axes[2]
-        ax_mean = axes[3]
 
-    # --- 2. Data preparation ---
+def resample_data_for_heatmap(zscore, reward_df, cutoff_pre_reward=-0.5, cutoff_post_reward=2, bin_size_s=0.05,
+                              category_by='time_in_port'):
+    """
+    This function put the time series data on a canvas that aligns them with each reward in time investment port.
+    Returns:
+        1. a uniform time vector that spans from cutoff_pre_reward to cutoff_post_reward with the bin size as step size;
+        2. category code array that tells you which category a certain row in the heatmap matrix belongs
+        3. category labels
+        4. heatmap matrix for directly putting into the seaborn heatmap function
+    Arguments:
+        zscore: time series data
+        reward_df: reward_df with each row containing information about a time-investment port reward
+        cutoff_pre_reward: left boundary of heatmap data selection
+        cutoff_post_reward: right boundary of heatmap data selection
+        bin_size_s: bin size in seconds
+        category_by: could be 'time_in_port' or 'block'
+    """
+    # --- 1. Data preparation ---
     valid_df = reward_df[
         reward_df['time_in_port'].notna() & (reward_df['IRI_prior'] > 1) & (reward_df['IRI_post'] >= 0.6)]
-    # Categorize 'time_in_port' for the bar plot
-    bins = [0, 4, 8, 12, np.inf]
-    bin_labels = ['0-4 s', '4-8 s', '8-12 s', '12+ s']
-    # Using labels=False gives integer codes (0, 1, 2, 3, 4) perfect for plotting
-    valid_df['time_cat_code'] = pd.cut(valid_df['time_in_port'], bins=bins, labels=False, right=False)
-    sorted_df = valid_df.sort_values(by='time_in_port').reset_index(drop=True)
-    bin_size_s = 0.05
+
+    if category_by == 'time_in_port':
+        bins = [0, 2, 6, 14, np.inf]
+        cat_labels = ['0-2 s', '2-6 s', '6-14 s', '>14 s']
+        valid_df['cat_code'] = pd.cut(valid_df['time_in_port'], bins=bins, labels=False, right=False)
+        sorted_df = valid_df.sort_values(by='time_in_port').reset_index(drop=True)
+    elif category_by == 'block':
+        cat_labels = ['low', 'high']
+        valid_df['cat_code'] = np.nan
+        valid_df.loc[valid_df['block'] == '0.4', 'cat_code'] = 0
+        valid_df.loc[valid_df['block'] == '0.8', 'cat_code'] = 1
+        sorted_df = valid_df.sort_values(by=['block', 'time_in_port']).reset_index(drop=True)
+    else:
+        raise ValueError("category_by must be 'time_in_port' or 'block'")
 
     original_timestamps = zscore['time_recording'].values
     original_zscore = zscore['green_left'].values
-    max_duration = sorted_df['IRI_post'].max()
-    cutoff_pre_reward = -0.5
-    cutoff_post_reward = 2
+
     uniform_time_vector = np.arange(cutoff_pre_reward, cutoff_post_reward + bin_size_s, bin_size_s)
     heatmap_matrix = np.full((len(sorted_df), len(uniform_time_vector)), np.nan)
 
-    # --- 3. Resample Each Trial and Place onto the Canvas ---
+    # --- 2. Resample Each Trial and Place onto the Canvas ---
     for idx, row in sorted_df.iterrows():
         start_time = row['reward_time'] + cutoff_pre_reward
         if pd.isna(row['next_reward_time']):
@@ -166,11 +172,21 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
             heatmap_matrix[idx, :len(resampled_zscores)] = resampled_zscores
         else:
             heatmap_matrix[idx, :] = resampled_zscores[:len(uniform_time_vector)]
+    category_codes = sorted_df['cat_code'].values
+    return uniform_time_vector, category_codes, cat_labels, heatmap_matrix
 
-    # --- 4. Calculate mean and sems ---
-    category_codes = sorted_df['time_cat_code'].values
+
+def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatmap_matrix, palette='Reds_r', split_cat=0,
+                                 legend_title='Time in Port', axes=None):
+    """
+    This function takes in prepared data and plot a heatmap and a plot with mean traces and error bands side by side
+    """
+    if heatmap_matrix.size == 0:
+        print("No data to plot after filtering.")
+        return None, None
+    # --- 1. Calculate mean and sems ---
     stats = {}
-    for i, label in enumerate(bin_labels):
+    for i, label in enumerate(cat_labels):
         sub_matrix = heatmap_matrix[category_codes == i]
         if sub_matrix.shape[0] > 0:
             mean_trace = np.nanmean(sub_matrix, axis=0)
@@ -186,13 +202,41 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
                 'n_trials': sub_matrix.shape[0]
             }
 
-    # --- 5. Plotting ---
+    # --- 2. Prepare axes/grids ---
+    if axes is None:
+        fig = plt.figure(figsize=(6, 3))
+        gs_outer = GridSpec(1, 2, width_ratios=[21.5, 20], wspace=0.3)
+        gs_inner = GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_outer[0], width_ratios=[0.5, 20, 1], wspace=0.05)
+        ax_bars = fig.add_subplot(gs_inner[0, 0])
+        ax_heatmap = fig.add_subplot(gs_inner[0, 1])
+        ax_cbar = fig.add_subplot(gs_inner[0, 2])
+        ax_mean = fig.add_subplot(gs_outer[0, 1])
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+        ax_bars = axes[0]
+        ax_heatmap = axes[1]
+        ax_cbar = axes[2]
+        ax_mean = axes[3]
+
+    # --- 3. Plotting ---
+    if split_cat:  # whether to add a blank space between different categories
+        change_indices = np.where(np.diff(category_codes) != 0)[0] + 1
+        for i in reversed(change_indices):
+            heatmap_matrix = np.insert(heatmap_matrix, i, np.nan, axis=0)
+            category_codes = np.insert(category_codes, i, np.nan)
+
     if np.all(np.isnan(heatmap_matrix)):
         print("No valid epochs were found to plot.")
         ax_heatmap.text(0.5, 0.5, 'No Data', ha='center', va='center')
         if return_handle:
             fig.show()
             return fig, ax_heatmap
+
+    cat_num = len(cat_labels)
+    palette_to_use = list(sns.color_palette(palette, n_colors=cat_num))
+    custom_cat_cmap = ListedColormap(palette_to_use)
 
     nodes = [0.0, 0.5, 0.75, 1.0]
     colors = ["blue", "black", "red", "yellow"]
@@ -201,7 +245,8 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
     # Plot the category bars on the left axis (ax_bars)
     category_matrix = category_codes[:, np.newaxis]  # Reshape for heatmap
     # Use 'Reds_r' to go from dark red (low NRIs) to light red (high NRIs)
-    sns.heatmap(category_matrix, ax=ax_bars, cmap='Reds_r', cbar=False, xticklabels=False, yticklabels=False)
+    # Use 'Set2' to distinguish low block and high block
+    sns.heatmap(category_matrix, ax=ax_bars, cmap=custom_cat_cmap, cbar=False, xticklabels=False, yticklabels=False)
     ax_bars.set_ylabel(None)  # Remove any potential labels
 
     # Plot main heatmap
@@ -219,39 +264,74 @@ def figc_example_session_heatmaps(zscore, reward_df, axes=None):
     ax_cbar.tick_params(direction='in', color='white')
 
     # Customize the x-axis ticks to show time in seconds
+    cutoff_pre_reward = round(time_vector[0], 1)
+    cutoff_post_reward = round(time_vector[-1], 2)
+    bin_size_s = round((time_vector[-1] - time_vector[0]) / (len(time_vector) - 1), 2)
     xtick_labels = [cutoff_pre_reward, 0, 1, cutoff_post_reward]
     xtick_positions = [
-        0,                                                  # Start position
-        np.abs(uniform_time_vector - 0).argmin(),           # Position of zero
-        np.abs(uniform_time_vector - 0).argmin() + int(1/bin_size_s), # Position of one
-        len(uniform_time_vector) - 1                        # End position
+        0,  # Start position
+        np.abs(time_vector - 0).argmin(),  # Position of zero
+        np.abs(time_vector - 0).argmin() + int(1 / bin_size_s),  # Position of one
+        len(time_vector) - 1  # End position
     ]
 
     ax_heatmap.set_xticks(xtick_positions)
     ax_heatmap.set_xticklabels(xtick_labels, rotation=0)
-    ax_heatmap.set_xlabel('Time from Reward (s)')
     ax_heatmap.set_ylabel(None)
 
     # plot mean traces and their error bands from each category
-    cat_num = len(stats)
-    palette = list(reversed(sns.color_palette("Reds", n_colors=cat_num)))
-    for i, label in enumerate(bin_labels[:-1]):
+    cat_num = len(cat_labels)
+    if cat_num > 2:
+        cat_labels_to_use = cat_labels[:-1]
+    elif cat_num == 2:
+        cat_labels_to_use = cat_labels
+    else:
+        raise ValueError("cat_labels must contain at least 2 elements.")
+
+    for i, label in enumerate(cat_labels_to_use):
         lower_bound = stats[label]['lower_bound']
         upper_bound = stats[label]['upper_bound']
-        ax_mean.plot(uniform_time_vector, stats[label]['mean'], label=label, color=palette[i])
-        ax_mean.fill_between(uniform_time_vector, lower_bound, upper_bound, color=palette[i], alpha=0.2)
-        ax_mean.spines['top'].set_visible(False)
-        ax_mean.spines['right'].set_visible(False)
-        # ax_mean.set_xticks(xtick_positions)
-        ax_mean.set_xlim([-0.5, 2])
-        ax_mean.set_xticks(xtick_labels)
-        ax_mean.set_xlabel('Time from Reward (s)')
-        ax_mean.set_ylabel('DA (z-score)')
-        ax_mean.legend(title='Time in Port', fontsize='small')
+        ax_mean.plot(time_vector, stats[label]['mean'], label=label, color=palette_to_use[i])
+        ax_mean.fill_between(time_vector, lower_bound, upper_bound, color=palette_to_use[i], alpha=0.2)
+    ax_mean.spines['top'].set_visible(False)
+    ax_mean.spines['right'].set_visible(False)
+    # ax_mean.set_xticks(xtick_positions)
+    ax_mean.set_xlim([cutoff_pre_reward, cutoff_post_reward])
+    ax_mean.set_xticks(xtick_labels)
+    # ax_mean.set_xlabel('Time from Reward (s)')
+    ax_mean.set_ylabel('DA (z-score)', labelpad=-6)
+    ax_mean.legend(title=legend_title, fontsize='x-small', handlelength=1, borderpad=0.4)
+
+    for ax in [ax_heatmap, ax_mean]:
+        ax.set_xlabel('Time from Reward (s)')
+
     if return_handle:
         fig.tight_layout()
         fig.show()
-        return fig, ax_heatmap
+
+
+def figc_example_session_heatmap_split_by_NRI(zscore, reward_df, axes=None):
+    time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
+        zscore, reward_df,
+        cutoff_pre_reward=-0.5,
+        cutoff_post_reward=2,
+        bin_size_s=0.05,
+        category_by='time_in_port'
+    )
+    plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Reds_r', split_cat=0,
+                                 legend_title='Time in Port', axes=axes)
+
+
+def figd_example_session_heatmap_split_by_block(zscore, reward_df, axes=None):
+    time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
+        zscore, reward_df,
+        cutoff_pre_reward=-0.5,
+        cutoff_post_reward=2,
+        bin_size_s=0.05,
+        category_by='block'  # Use 'block' to test the new logic
+    )
+    plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
+                                 legend_title='Block', axes=axes)
 
 
 def setup_axes():
@@ -371,6 +451,21 @@ def main():
     # '2024-01-13T20_50': trial 38, 39, 43
     # --- example trial log ends ---
 
+    # --- good example sessions for heatmaps ---
+    # animal SZ036
+    # '2024-01-03T16_13'
+    # '2024-01-04T11_40'
+    # '2024-01-12T18_23'
+    # animal SZ037
+    # '2024-01-04T12_45'
+    # '2024-01-12T10_36'
+    # animal SZ042
+    # '2023-12-07T14_47'
+    # '2023-12-27T17_02'
+    # '2023-12-28T16_34'
+    # '2023-12-30T21_48'
+    # --- example trial log ends ---
+
     # --- data preparation ---
     animal_str = 'SZ036'
     session_name = '2024-01-08T13_52'
@@ -380,8 +475,8 @@ def main():
     trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
                                                   file_format='parquet')
 
-    animal_str = 'SZ036'
-    session_name = '2024-01-04T15_49'
+    animal_str = 'SZ037'
+    session_name = '2024-01-04T12_45'
     zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
                                                         file_format='parquet')
     reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
@@ -397,15 +492,17 @@ def main():
     print(f'figa_example_trial took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    figc_example_session_heatmaps(zscore_heatmap, reward_df, axes=axes[3:7])
-    print(f'figd_example_session_heatmaps took {time.time() - tic:.2f} seconds')
+    figc_example_session_heatmap_split_by_NRI(zscore_heatmap, reward_df, axes=axes[3:7])
+    print(f'figc_example_session_heatmap_split_by_NRI took {time.time() - tic:.2f} seconds')
+
+    tic = time.time()
+    figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=axes[7:11])
+    print(f'figc_example_session_heatmap_split_by_NRI took {time.time() - tic:.2f} seconds')
 
     plt.subplots_adjust(hspace=0, wspace=0)
     plt.show()
     print('hello')
     # --- end of adding figures to axes
-
-
 
     # --- go through all the trials in one session when looking for good trials ---
     # for trial_id in trial_df['trial'].values:
@@ -416,10 +513,30 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # animal_str = 'SZ036'
-    # session_name = '2024-01-04T15_49'
-    # zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
-    #                                                     file_format='parquet')
-    # reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
-    #                                                file_format='parquet')
-    # figc_example_session_heatmaps(zscore_heatmap, reward_df, axes=None)
+    # animal_str = 'SZ037'
+    # # session_name = '2024-01-04T15_49'
+    # for i in range(0, 25):
+    #     session_id = i
+    #     zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_id=i,
+    #                                                         file_format='parquet')
+    #     reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_id=i,
+    #                                                    file_format='parquet')
+    #     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
+    #         zscore_heatmap, reward_df,
+    #         cutoff_pre_reward=-0.5,
+    #         cutoff_post_reward=2,
+    #         bin_size_s=0.05,
+    #         category_by='time_in_port'  # Use 'block' to test the new logic
+    #     )
+    #     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Reds_r', split_cat=0,
+    #                                  axes=None)
+    #
+    #     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
+    #         zscore_heatmap, reward_df,
+    #         cutoff_pre_reward=-0.5,
+    #         cutoff_post_reward=2,
+    #         bin_size_s=0.05,
+    #         category_by='block'  # Use 'block' to test the new logic
+    #     )
+    #     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
+    #                                  axes=None)
