@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import pickle
+import glob
 
 
 def load_session_dataframe(animal_id, df_name, session_id=None, session_long_name=None, file_format='parquet'):
@@ -71,15 +72,65 @@ def load_session_dataframe(animal_id, df_name, session_id=None, session_long_nam
         return None
 
 
-def load_animal_summary_data(base_processed_dir, animal_id, summary_name, file_format='csv'):
-    """Loads animal-level summary data."""
-    # Similar logic, path might be slightly different (e.g., directly in animal_id/processed_data or a summary subfolder)
-    # ...
-    pass
+def load_dataframes_for_animal_summary(animal_ids, df_name, file_format='parquet'):
+    """
+    Loads and concatenates data files for a list of animals.
+
+    Args:
+        animal_ids (list): List of animal identifiers (strings).
+        df_name (str): Common name identifier in the filenames (e.g., "DA_features").
+        file_format (str, optional): The file extension ('parquet', 'csv', etc.). Defaults to 'parquet'.
+
+    Returns:
+        pandas.DataFrame: A single dataframe containing concatenated data from all animals,
+                          or an empty DataFrame if no files were found.
+    """
+    # A list to store the individual dataframes before concatenation
+    all_animal_data = []
+
+    # Loop through each animal's data folder
+    for animal in animal_ids:
+        # Define the path to the processed data for the current animal
+        processed_dir = os.path.join(config.MAIN_DATA_ROOT, animal, config.PROCESSED_DATA_SUBDIR)
+        if not os.path.exists(processed_dir):
+            print(f"Warning: Directory not found, skipping: {animal}")
+            continue
+        # Find all the files with the df_name and the file_format in the directory
+        search_path = os.path.join(processed_dir, f"*_{df_name}.{file_format}")
+        session_files = glob.glob(search_path)
+        if not session_files:
+            print(f"ℹ️ Info: No '{df_name}' files found for animal {animal} in {processed_dir}")
+            continue
+        # Read each file, add the 'animal' column, and append to the list
+        for file in session_files:
+            if file_format == 'parquet':
+                df = pd.read_parquet(file)
+            elif file_format == 'csv':
+                df = pd.read_csv(file)
+            else:
+                print(f"Unsupported file format: {file_format}")
+                continue
+            df['animal'] = animal
+            all_animal_data.append(df)
+
+    # Concatenate all the dataframes in the list into a single, master dataframe
+    if not all_animal_data:
+        print("Error: No dataframes were loaded. Returning an empty DataFrame.")
+        return pd.DataFrame()
+    else:
+        master_dataframe = pd.concat(all_animal_data, ignore_index=True)
+        print(master_dataframe.head())
+        print(f"\nTotal number of data points: {len(master_dataframe)}")
+        return master_dataframe
 
 if __name__ == '__main__':
-    animal_str = 'SZ036'
-    session_id = 11
-    session_long_name = '2024-01-11T16_25'
-    zscore = load_session_dataframe(animal_str, 'zscore', session_long_name=session_long_name, session_id=11, file_format='parquet')
+    # animal_str = 'SZ036'
+    # session_id = 11
+    # session_long_name = '2024-01-11T16_25'
+    # zscore = load_session_dataframe(animal_str, 'zscore', session_long_name=session_long_name, session_id=11, file_format='parquet')
+
+
+    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    master_dataframe = load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features', 'parquet')
+
     print('Hello')
