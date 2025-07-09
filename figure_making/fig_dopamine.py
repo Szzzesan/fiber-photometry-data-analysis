@@ -350,6 +350,8 @@ def figd_example_session_heatmap_split_by_block(zscore, reward_df, axes=None):
     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
                                  legend_title='Block', axes=axes)
 
+def fige_DA_vs_NRI_by_animal(master_df, axes=None):
+
 
 def setup_axes():
     fig_size = (12, 12)  # (width, height) in inches
@@ -495,6 +497,9 @@ def main():
                                                         file_format='parquet')
     reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
                                                    file_format='parquet')
+
+    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features', 'parquet')
     # --- end of data preparation ---
 
     # --- set up axes and add figures to axes ---
