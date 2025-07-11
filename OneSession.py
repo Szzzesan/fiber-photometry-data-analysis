@@ -1455,37 +1455,37 @@ class OneSession:
                 self._save_data_object(self.pi_events, "pi_events_processed", format)
 
     def save_trial_df(self, format='parquet'):  # pi_events might be best as CSV
-        if self.pi_events is not None:
+        if self.trial_df is not None:
             if format == 'csv':
                 self._save_data_object(self.trial_df, "trial_df", format, index=False)
             else:
                 self._save_data_object(self.trial_df, "trial_df", format)
     def save_expreward_df(self, format='parquet'):
-        if self.reward_features_DA is not None:
+        if self.expreward_df is not None:
             if format == 'csv':
                 self._save_data_object(self.expreward_df, "expreward_df", format, index=False)
             else:
                 self._save_data_object(self.expreward_df, "expreward_df", format)
-    def save_reward_features_DA(self, format='parquet'):
-        if self.reward_features_DA is not None:
+    def save_DA_vs_features(self, format='parquet'):
+        if self.DA_vs_NRI_IRI is not None:
             if format == 'csv':
-                self._save_data_object(self.reward_features_DA, "reward_features_DA", format, index=False)
+                self._save_data_object(self.DA_vs_NRI_IRI, "DA_vs_features", format, index=False)
             else:
-                self._save_data_object(self.reward_features_DA, "reward_features_DA", format)
+                self._save_data_object(self.DA_vs_NRI_IRI, "DA_vs_features", format)
 
 
 if __name__ == '__main__':
     test_session = OneSession('SZ036', 13, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
-    test_session.save_dFF0_and_zscore(format='parquet')
+    # test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
     # test_session.save_pi_events(format='parquet')
     test_session.construct_trial_df()
-    test_session.save_trial_df(format='parquet')
+    # test_session.save_trial_df(format='parquet')
     test_session.construct_expreward_interval_df()
-    test_session.save_expreward_df(format='parquet')
+    # test_session.save_expreward_df(format='parquet')
     # test_session.extract_bg_behav_by_trial()
     # test_session.plot_reward_aligned_lick_histograms()
     # test_session.calculate_lick_rates_around_bg_reward(reward_idx_to_align=2, plot_comparison=1)
@@ -1495,11 +1495,12 @@ if __name__ == '__main__':
     # test_session.plot_heatmaps(save=1)
     # test_session.plot_bg_heatmaps(save=0)
     # test_session.actual_leave_vs_adjusted_optimal(save=0)
-    test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
-    df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
-                                                             block_split=False,
-                                                             plot_histograms=0, plot_linecharts=1)
+    # test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
+    # df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
+    #                                                          block_split=False,
+    #                                                          plot_histograms=0, plot_linecharts=1)
     test_session.visualize_DA_vs_NRI_IRI(plot_scatters=0, plot_histograms=0)
+    test_session.save_DA_vs_features(format='csv')
     # DA_in_block_transition = test_session.bg_port_in_block_reversal(plot_single_traes=0, plot_average=0)
 
     # test_session.scatterplot_nonreward_DA_vs_NRI()
