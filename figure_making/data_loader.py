@@ -4,6 +4,7 @@ import numpy as np
 import os
 import pickle
 import glob
+import quality_control as qc
 
 
 def load_session_dataframe(animal_id, df_name, session_id=None, session_long_name=None, file_format='parquet'):
@@ -85,11 +86,14 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, file_format='parquet
         pandas.DataFrame: A single dataframe containing concatenated data from all animals,
                           or an empty DataFrame if no files were found.
     """
+
+
     # A list to store the individual dataframes before concatenation
     all_animal_data = []
 
     # Loop through each animal's data folder
     for animal in animal_ids:
+
         # Define the path to the processed data for the current animal
         processed_dir = os.path.join(config.MAIN_DATA_ROOT, animal, config.PROCESSED_DATA_SUBDIR)
         if not os.path.exists(processed_dir):
@@ -102,6 +106,7 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, file_format='parquet
             print(f"ℹ️ Info: No '{df_name}' files found for animal {animal} in {processed_dir}")
             continue
         # Read each file, add the 'animal' column, and append to the list
+        animal_rules = qc.qc_selections[animal]
         for file in session_files:
             if file_format == 'parquet':
                 df = pd.read_parquet(file)
@@ -110,8 +115,15 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, file_format='parquet
             else:
                 print(f"Unsupported file format: {file_format}")
                 continue
-            df['animal'] = animal
-            all_animal_data.append(df)
+            masks_to_keep = []
+            for hemi in animal_rules:
+                masks_to_keep.append(df['hemisphere'] == hemi)
+            if masks_to_keep:
+                final_mask = np.logical_or.reduce(masks_to_keep)
+                df = df[final_mask].reset_index(drop=True)
+                if not df.empty:
+                    df['animal'] = animal
+                    all_animal_data.append(df)
 
     # Concatenate all the dataframes in the list into a single, master dataframe
     if not all_animal_data:
