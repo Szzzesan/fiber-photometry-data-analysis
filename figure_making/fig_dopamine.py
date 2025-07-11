@@ -6,8 +6,12 @@ import helper
 
 import numpy as np
 import pandas as pd
-import time
 
+from scipy.stats import gaussian_kde
+from scipy.optimize import curve_fit
+from scipy.stats import t
+
+import time
 import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -17,6 +21,8 @@ import matplotlib.patches as mpatches
 import matplotlib.ticker as mticker
 
 mpl.rcParams['figure.dpi'] = 300
+
+
 # # Using a dictionary is a clean way to update multiple parameters
 # params = {
 #     'axes.labelsize': 9,
@@ -350,7 +356,131 @@ def figd_example_session_heatmap_split_by_block(zscore, reward_df, axes=None):
     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
                                  legend_title='Block', axes=axes)
 
-def fige_DA_vs_NRI_by_animal(master_df, axes=None):
+
+def get_mean_sem_DA_for_feature(df, var='NRI', sample_per_bin=250):
+    df_sorted = df.sort_values(by=var).reset_index(drop=True)
+    total_sample = len(df_sorted)
+    bin_num = int(total_sample / sample_per_bin)
+    arr_bin_center = np.zeros(bin_num)
+    arr_mean = np.zeros(bin_num)
+    arr_sem = np.zeros(bin_num)
+    for i in range(bin_num):
+        arr_bin_center[i] = (df_sorted.iloc[sample_per_bin * i][var] + df_sorted.iloc[sample_per_bin * (i + 1) - 1][
+            var]) / 2
+        arr_mean[i] = df_sorted.iloc[sample_per_bin * i:sample_per_bin * (i + 1)]['DA'].mean()
+        arr_sem[i] = df_sorted.iloc[sample_per_bin * i:sample_per_bin * (i + 1)]['DA'].sem()
+    mean_sem_df = pd.DataFrame({'bin_center': arr_bin_center, 'mean': arr_mean, 'sem': arr_sem})
+    return mean_sem_df
+
+
+# def make_scatter_plot(df, x_var, y_var):
+
+def figef_DA_vs_NRI(master_df, axes=None):
+    data = master_df[(master_df['IRI'] > 1)]
+    if axes is None:
+        fig, axes = plt.subplots(1, 2, figsize=(20, 6))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+    ax = axes[0]
+    for animal in data['animal'].unique():
+        subset = data[data['animal'] == animal].copy()
+        # # if plot scatter
+        xy = np.vstack([subset['NRI'], subset['DA']])
+        z = gaussian_kde(xy)(xy)
+        subset['density'] = z
+        sample_data = subset.sample(n=500, random_state=101).copy()  # if by fraction, use frac=0.05
+        sample_data.sort_values('density', inplace=True)
+        jitter_amount = 0.05
+        sample_data['jittered_NRI'] = sample_data['NRI'] + np.random.normal(0, jitter_amount, size=len(sample_data))
+        sns.scatterplot(data=sample_data, x='jittered_NRI', y='DA', hue='density', legend=False, alpha=0.5, s=5,
+                        edgecolor='none', ax=ax)
+        # df_plot = get_mean_sem_DA_for_feature(subset, var='NRI', sample_per_bin=300)
+        # x = df_plot['bin_center']
+        # y = df_plot['mean']
+        # y_err = df_plot['sem']
+        # line = ax.plot(x, y, linewidth=1.5, alpha=0.8, label=animal)
+        # ax.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.5)
+
+        # if plot fitted logarithmic function
+        x_fit, y_fit, upper, lower = fit_to_logarithmic(subset, 'NRI', 'DA')
+        line = ax.plot(x_fit, y_fit, linewidth=1.5, label=f'{animal}')
+        ax.fill_between(x_fit, lower, upper, color=line[0].get_color(), alpha=0.3)
+        ax.legend(title='Animal', fontsize='x-small')
+
+    ax = axes[1]
+    for block in data['block'].unique():
+        if block == '0.4':
+            color = sns.color_palette('Set2')[0]
+            label = 'low'
+        elif block == '0.8':
+            color = sns.color_palette('Set2')[1]
+            label = 'high'
+        subset = data[data['block'] == block].copy()
+        xy = np.vstack([subset['NRI'], subset['DA']])
+        z = gaussian_kde(xy)(xy)
+        subset['density'] = z
+        sample_data = subset.sample(n=1000, random_state=1001).copy()  # if by fraction, use frac=0.05
+        sample_data.sort_values('density', inplace=True)
+        jitter_amount = 0.05
+        sample_data['jittered_NRI'] = sample_data['NRI'] + np.random.normal(0, jitter_amount, size=len(sample_data))
+        sns.scatterplot(data=sample_data, x='jittered_NRI', y='DA', hue='density',
+                        palette=sns.light_palette(color, as_cmap=True),
+                        legend=False, alpha=0.7, s=5, edgecolor='none', ax=ax)
+        x_fit, y_fit, upper, lower = fit_to_logarithmic(subset, 'NRI', 'DA')
+        ax.plot(x_fit, y_fit, c=color, linewidth=1.5, label=label)
+        ax.fill_between(x_fit, lower, upper, color=color, alpha=0.3)
+        ax.legend(title='Context\nReward Rate', fontsize='small')
+
+    for ax in axes.flat:
+        ax.set_xlim([-0.1, 11])
+        ax.set_ylim([0, 4.5])
+        ax.set_xlabel('Time since Entry (s)')
+        ax.set_ylabel('DA amplitude')
+        ax.set_title('DA vs. NRI')
+
+    if return_handle:
+        fig.show()
+        return fig, axes
+
+def figg_DA_vs_IRI(master_df, axes=None):
+    data = master_df
+    if axes is None:
+        fig, axes = plt.subplots(1, 1, figsize=(4, 6))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+    ax = axes
+
+    for animal in data['animal'].unique():
+        subset = data[data['animal'] == animal].copy()
+        # # if plot scatter
+        xy = np.vstack([subset['IRI'], subset['DA']])
+        z = gaussian_kde(xy)(xy)
+        subset['density'] = z
+        sample_data = subset.sample(n=500, random_state=101).copy()  # if by fraction, use frac=0.05
+        sample_data.sort_values('density', inplace=True)
+        jitter_amount = 0.05
+        sample_data['jittered_IRI'] = sample_data['IRI'] + np.random.normal(0, jitter_amount, size=len(sample_data))
+        sns.scatterplot(data=sample_data, x='jittered_IRI', y='DA', hue='density', legend=False, alpha=0.5, s=5,
+                        edgecolor='none', ax=ax)
+
+        # # if plot fitted logarithmic function
+        # x_fit, y_fit, upper, lower = fit_to_logarithmic(subset, 'NRI', 'DA')
+        # line = ax.plot(x_fit, y_fit, linewidth=1.5, label=f'{animal}')
+        # ax.fill_between(x_fit, lower, upper, color=line[0].get_color(), alpha=0.3)
+        # ax.legend(title='Animal', fontsize='x-small')
+        ax.set_xlim([-0.1, 5.55])
+        ax.set_ylim([0, 4.5])
+        ax.set_xlabel('Time since Last Reward (s)')
+        ax.set_ylabel('DA amplitude')
+        ax.set_title('DA vs. IRI')
+
+    if return_handle:
+        fig.show()
+        return fig, axes
 
 
 def setup_axes():
@@ -458,6 +588,37 @@ def draw_vertical_lines(ax, x_npy, ymin=0, ymax=1, color='r', alpha=1, linestyle
         ax.axvline(x_value, ymin=ymin, ymax=ymax, color=color, linestyle=linestyle, linewidth=linewidth)
 
 
+def log_func(x, a, b):
+    # y = a * log(x) + b
+    # This function requires x > 0.
+    return a * np.log(x) + b
+
+
+def fit_to_logarithmic(df, x_col, y_col):
+    # curve fit
+    popt, pcov = curve_fit(log_func, df[x_col], df[y_col])
+    a_opt, b_opt = popt
+
+    # confidence interval
+    n = len(df[x_col])  # Number of data points
+    dof = n - len(popt)  # Degrees of freedom
+    alpha = 0.05  # Confidence level (1 - 0.95 = 0.05)
+    t_crit = np.abs(t.ppf(alpha / 2, dof))  # Critical t-value
+
+    # smooth x space
+    x_fit = np.linspace(df[x_col].min(), df[x_col].quantile(0.95), 200)
+    y_fit = log_func(x_fit, a_opt, b_opt)
+
+    # standard error of the y-fit
+    y_fit_stderr = np.sqrt(pcov[0, 0] * (np.log(x_fit)) ** 2 + pcov[1, 1] + 2 * pcov[0, 1] * np.log(x_fit))
+
+    # upper and lower bounds of the confidence interval
+    upper_bound = y_fit + t_crit * y_fit_stderr
+    lower_bound = y_fit - t_crit * y_fit_stderr
+
+    return x_fit, y_fit, upper_bound, lower_bound
+
+
 # --- end of helper function
 def main():
     # --- good example trials that show DA correlated with NRI ---
@@ -499,6 +660,7 @@ def main():
                                                    file_format='parquet')
 
     animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # animal_ids=["SZ036"]
     master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features', 'parquet')
     # --- end of data preparation ---
 
@@ -518,7 +680,15 @@ def main():
     figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=axes[7:11])
     print(f'figd_example_session_heatmap_split_by_block took {time.time() - tic:.2f} seconds')
 
-    plt.subplots_adjust(hspace=0, wspace=0) # left=0.07, right=0.98, bottom=0.15, top=0.9
+    tic = time.time()
+    figef_DA_vs_NRI(master_DA_features_df, axes=axes[11:13])
+    print(f'figef_DA_vs_NRI took {time.time() - tic:.2f} seconds')
+
+    tic = time.time()
+    figg_DA_vs_IRI(master_DA_features_df, axes=axes[13])
+    print(f'figg_DA_vs_IRI took {time.time() - tic:.2f} seconds')
+
+    plt.subplots_adjust(hspace=0, wspace=0)  # left=0.07, right=0.98, bottom=0.15, top=0.9
     plt.show()
     print('hello')
     # --- end of adding figures to axes
@@ -532,6 +702,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
     # animal_str = 'SZ037'
     # # session_name = '2024-01-04T15_49'
     # for i in range(0, 25):
@@ -559,3 +730,10 @@ if __name__ == '__main__':
     #     )
     #     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
     #                                  axes=None)
+
+    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # # animal_ids = ["SZ036"]
+    # master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features', 'parquet')
+    # figef_DA_vs_NRI(master_DA_features_df, axes=None)
+    # figg_DA_vs_IRI(master_DA_features_df, axes=None)
+    print("hello")
