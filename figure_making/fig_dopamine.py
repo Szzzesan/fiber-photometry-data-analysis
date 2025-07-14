@@ -280,7 +280,8 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
     )
 
     # ax_cbar.tick_params(width=0.3, length=0.8, labelsize=4, direction='in', color='white')
-    ax_cbar.set_title('DA\n(z-score)', fontsize='small', pad=0)
+    # ax_cbar.set_title('DA\n(z-score)', fontsize='small', pad=0) # if label on top
+    ax_cbar.set_ylabel('DA (z-score)', fontsize='small', rotation=-90, labelpad=-4, va="bottom") # if label on the side
     ax_cbar.tick_params(direction='in', color='white', labelsize='small')
 
     # Customize the x-axis ticks to show time in seconds
@@ -342,7 +343,7 @@ def figc_example_session_heatmap_split_by_NRI(zscore, reward_df, axes=None):
         category_by='time_in_port'
     )
     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Reds_r', split_cat=0,
-                                 legend_title='Time in Port', axes=axes)
+                                 legend_title='Reward Time\nfrom Entry', axes=axes)
 
 
 def figd_example_session_heatmap_split_by_block(zscore, reward_df, axes=None):
@@ -593,7 +594,7 @@ def setup_axes_v2():
     col_2 = [1, 1, 1]
 
     row_1_margins = [4, 6]
-    row_2_margins = [1, 1, 10, 6]
+    row_2_margins = [1, 1, 10, 8]
     col_1_margins = [10, 10]
     col_2_margins = [10, 10]
 
@@ -748,7 +749,7 @@ def main():
     # --- end of data preparation ---
 
     # --- set up axes and add figures to axes ---
-    axes = setup_axes_v1()
+    axes = setup_axes_v2()
 
     tic = time.time()
     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=axes[0])
@@ -784,8 +785,7 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    setup_axes_v2()
+    main()
 
     # animal_str = 'SZ037'
     # # session_name = '2024-01-04T15_49'
