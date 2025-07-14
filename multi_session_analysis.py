@@ -458,14 +458,14 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
         try:
             ani_summary.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch,
                                                          port_swap=port_swap)
-            # ani_summary.session_obj_list[i].examine_raw(save=1)
-            ani_summary.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=0, save=0)
+            ani_summary.session_obj_list[i].examine_raw(save=1)
+            ani_summary.session_obj_list[i].calculate_dFF0(plot=0, plot_middle_step=1, save=0)
             # ani_summary.session_obj_list[i].save_dFF0_and_zscore(format='parquet')
             ani_summary.session_obj_list[i].process_behavior_data(save=0)
             # ani_summary.session_obj_list[i].save_pi_events(format='parquet')
             # ani_summary.session_obj_list[i].construct_trial_df()
             # ani_summary.session_obj_list[i].save_trial_df(format='parquet')
-            ani_summary.session_obj_list[i].construct_expreward_interval_df()
+            # ani_summary.session_obj_list[i].construct_expreward_interval_df()
             # ani_summary.session_obj_list[i].save_expreward_df(format='parquet')
             # DA_block_transition_list[i] = ani_summary.session_obj_list[i].bg_port_in_block_reversal(plot_single_traes=0,
             #                                                                                         plot_average=0)
@@ -476,13 +476,13 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
             # ani_summary.session_obj_list[i].actual_leave_vs_adjusted_optimal(save=0)
             # ani_summary.session_obj_list[i].extract_transient(plot_zscore=0)
             # ani_summary.session_obj_list[i].visualize_correlation_scatter(save=0)
-            # ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=0)
-            ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
-            ani_summary.session_obj_list[i].save_DA_vs_features(format='parquet')
-            # ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
-            #                                                          block_split=True,
-            #                                                          plot_linecharts=0,
-            #                                                          plot_histograms=0)
+            ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=0)
+            # ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
+            # ani_summary.session_obj_list[i].save_DA_vs_features(format='parquet')
+            ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
+                                                                     block_split=False,
+                                                                     plot_linecharts=1,
+                                                                     plot_histograms=0)
             # ani_summary.session_obj_list[i].extract_binned_da_vs_reward_history_matrix(binsize=0.1, save=1)
 
         except:
@@ -525,6 +525,9 @@ if __name__ == '__main__':
     #
     # session_list = [0, 1, 2, 4, 11, 12, 13, 14, 15, 17, 18, 20, 22, 23, 24]
     # summary_RK6 = multi_session_analysis('RK006', session_list, include_branch='both', port_swap=1)
+
+    session_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    summary_RK9 = multi_session_analysis('RK009', session_list, include_branch='both', port_swap=1)
 
     session_list = [1, 2, 3, 5, 7, 9, 11, 12, 14, 15, 19, 22, 23, 24, 25]
     summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')

@@ -845,7 +845,6 @@ class OneSession:
                           'left_DA_mean', 'left_DA_sem']
         self.DA_NRI_block_priorrewards = DA_amp[['block', 'time_in_port_bin', 'num_rewards_prior_bin',
                                                  'right_DA_mean', 'left_DA_mean']]
-        print('hello')
 
     def visualize_average_traces(self, variable='time_in_port', method='even_time', block_split=False,
                                  plot_linecharts=0, plot_histograms=0, save=0):
@@ -1475,7 +1474,7 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ036', 13, include_branch='both', port_swap=0)
+    test_session = OneSession('RK010', 13, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.save_dFF0_and_zscore(format='parquet')
@@ -1495,10 +1494,10 @@ if __name__ == '__main__':
     # test_session.plot_heatmaps(save=1)
     # test_session.plot_bg_heatmaps(save=0)
     # test_session.actual_leave_vs_adjusted_optimal(save=0)
-    # test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
-    # df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
-    #                                                          block_split=False,
-    #                                                          plot_histograms=0, plot_linecharts=1)
+    test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
+    df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
+                                                             block_split=False,
+                                                             plot_histograms=0, plot_linecharts=1)
     test_session.visualize_DA_vs_NRI_IRI(plot_scatters=0, plot_histograms=0)
     test_session.save_DA_vs_features(format='csv')
     # DA_in_block_transition = test_session.bg_port_in_block_reversal(plot_single_traes=0, plot_average=0)
