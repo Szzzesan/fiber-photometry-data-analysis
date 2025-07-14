@@ -436,13 +436,14 @@ def figef_DA_vs_NRI(master_df, axes=None):
     for ax in axes.flat:
         ax.set_xlim([-0.1, 11])
         ax.set_ylim([0, 4.5])
-        ax.set_xlabel('Time since Entry (s)')
+        ax.set_xlabel('Reward Time from Entry (s)')
         ax.set_ylabel('DA amplitude')
         ax.set_title('DA vs. NRI')
 
     if return_handle:
         fig.show()
         return fig, axes
+
 
 def figg_DA_vs_IRI(master_df, axes=None):
     data = master_df
@@ -474,7 +475,7 @@ def figg_DA_vs_IRI(master_df, axes=None):
         # ax.legend(title='Animal', fontsize='x-small')
         ax.set_xlim([-0.1, 5.55])
         ax.set_ylim([0, 4.5])
-        ax.set_xlabel('Time since Last Reward (s)')
+        ax.set_xlabel('Reward Time from Prior Reward (s)')
         ax.set_ylabel('DA amplitude')
         ax.set_title('DA vs. IRI')
 
@@ -483,44 +484,44 @@ def figg_DA_vs_IRI(master_df, axes=None):
         return fig, axes
 
 
-def setup_axes():
-    fig_size = (12, 12)  # (width, height) in inches
+def setup_axes_v1():
+    fig_size = (12, 10)  # (width, height) in inches
     rows, cols = fig_size[1] * 10, fig_size[0] * 10
 
     row_1 = [8, 1, 2]
     row_2 = [1, 15, 2, 15, 1, 15, 2, 15]
     row_3 = [2, 2, 1]
-    row_4 = [3, 2]
-    col_1 = [1, 2, 3, 3]
+    # row_4 = [3, 2]
+    col_1 = [3, 4, 3]
 
     row_1_margins = [4, 6]
-    row_2_margins = [1, 1, 8, 6, 1, 1, 8]
-    row_3_margins = [6, 6]
-    row_4_margins = [10]
-    col_1_margins = [10, 10, 8]
+    row_2_margins = [1, 1, 10, 6, 1, 1, 10]
+    row_3_margins = [10, 10]
+    # row_4_margins = [10]
+    col_1_margins = [10, 10]
 
     row_1_splits = [int((cols - np.sum(row_1_margins)) * h / sum(row_1)) for h in row_1]
     row_2_splits = [int((cols - np.sum(row_2_margins)) * h / sum(row_2)) for h in row_2]
     row_3_splits = [int((cols - np.sum(row_3_margins)) * h / sum(row_3)) for h in row_3]
-    row_4_splits = [int((cols - np.sum(row_4_margins)) * h / sum(row_4)) for h in row_4]
+    # row_4_splits = [int((cols - np.sum(row_4_margins)) * h / sum(row_4)) for h in row_4]
     col_1_splits = [int((rows - np.sum(col_1_margins)) * h / sum(col_1)) for h in col_1]
 
     row_1_splits = [val for pair in zip(row_1_splits, row_1_margins + [0]) for val in pair][:-1]
     row_2_splits = [val for pair in zip(row_2_splits, row_2_margins + [0]) for val in pair][:-1]
     row_3_splits = [val for pair in zip(row_3_splits, row_3_margins + [0]) for val in pair][:-1]
-    row_4_splits = [val for pair in zip(row_4_splits, row_4_margins + [0]) for val in pair][:-1]
+    # row_4_splits = [val for pair in zip(row_4_splits, row_4_margins + [0]) for val in pair][:-1]
     col_1_splits = [val for pair in zip(col_1_splits, col_1_margins + [0]) for val in pair][:-1]
 
     row_1_splits = np.cumsum(row_1_splits)
     row_2_splits = np.cumsum(row_2_splits)
     row_3_splits = np.cumsum(row_3_splits)
-    row_4_splits = np.cumsum(row_4_splits)
+    # row_4_splits = np.cumsum(row_4_splits)
     col_1_splits = np.cumsum(col_1_splits)
 
     row_1_splits[-1] = cols
     row_2_splits[-1] = cols
     row_3_splits[-1] = cols
-    row_4_splits[-1] = cols
+    # row_4_splits[-1] = cols
     col_1_splits += rows - col_1_splits[-1]
 
     fig = plt.figure(figsize=fig_size)
@@ -558,10 +559,10 @@ def setup_axes():
         fig.add_subplot(gs[col_1_splits[3]:col_1_splits[4],
                         row_3_splits[3]:row_3_splits[4]]),  # DA vs. IRI
 
-        fig.add_subplot(gs[col_1_splits[5]:col_1_splits[6],
-                        :row_4_splits[0]]),  # heatmap of DA vs. NRI vs. IRI and split by block
-        fig.add_subplot(gs[col_1_splits[5]:col_1_splits[6],
-                        row_4_splits[1]:row_4_splits[2]]),  # scatters of predicted DA vs. real DA with fitting
+        # fig.add_subplot(gs[col_1_splits[5]:col_1_splits[6],
+        #                 :row_4_splits[0]]),  # heatmap of DA vs. NRI vs. IRI and split by block
+        # fig.add_subplot(gs[col_1_splits[5]:col_1_splits[6],
+        #                 row_4_splits[1]:row_4_splits[2]]),  # scatters of predicted DA vs. real DA with fitting
 
     ]
 
@@ -571,7 +572,89 @@ def setup_axes():
     #     ax.spines['top'].set_visible(False)
 
     lettering = 'abcdefghijklmnopqrstuvwxyz'
-    axes_to_letter = [0, 2, 3, 7, 11, 12, 13, 14, 15]
+    axes_to_letter = [0, 2, 3, 7, 11, 12, 13]
+    for i, ax in enumerate(axes_to_letter):
+        axes[ax].text(
+            0.0, 1.0, lettering[i], transform=(
+                    axes[ax].transAxes + ScaledTranslation(-20 / 72, +7 / 72, fig.dpi_scale_trans)),
+            fontsize='large', va='bottom', fontfamily='sans-serif', weight='bold')
+
+    axes = np.array(axes)
+    return axes
+
+
+def setup_axes_v2():
+    fig_size = (12, 10)  # (width, height) in inches
+    rows, cols = fig_size[1] * 10, fig_size[0] * 10
+
+    row_1 = [8, 1, 2]
+    row_2 = [1, 15, 2, 15, 30]
+    col_1 = [1, 2, 2]
+    col_2 = [1, 1, 1]
+
+    row_1_margins = [4, 6]
+    row_2_margins = [1, 1, 10, 6]
+    col_1_margins = [10, 10]
+    col_2_margins = [10, 10]
+
+    row_1_splits = [int((cols - np.sum(row_1_margins)) * h / sum(row_1)) for h in row_1]
+    row_2_splits = [int((cols - np.sum(row_2_margins)) * h / sum(row_2)) for h in row_2]
+    col_1_splits = [int((rows - np.sum(col_1_margins)) * h / sum(col_1)) for h in col_1]
+    col_2_splits = [int((rows - np.sum(col_2_margins) - col_1_splits[0] - col_1_margins[0]) * h / sum(col_2)) for h in
+                    col_2]
+    col_2_splits = [col_1_splits[0]] + col_2_splits
+    col_2_margins = [col_1_margins[0]] + col_2_margins
+
+    row_1_splits = [val for pair in zip(row_1_splits, row_1_margins + [0]) for val in pair][:-1]
+    row_2_splits = [val for pair in zip(row_2_splits, row_2_margins + [0]) for val in pair][:-1]
+    col_1_splits = [val for pair in zip(col_1_splits, col_1_margins + [0]) for val in pair][:-1]
+    col_2_splits = [val for pair in zip(col_2_splits, col_2_margins + [0]) for val in pair][:-1]
+
+    row_1_splits = np.cumsum(row_1_splits)
+    row_2_splits = np.cumsum(row_2_splits)
+    col_1_splits = np.cumsum(col_1_splits)
+    col_2_splits = np.cumsum(col_2_splits)
+
+    row_1_splits[-1] = cols
+    row_2_splits[-1] = cols
+    col_1_splits += rows - col_1_splits[-1]
+    col_2_splits[1:] += rows - col_2_splits[-1]
+
+    fig = plt.figure(figsize=fig_size)
+    gs = gridspec.GridSpec(rows, cols, figure=fig)
+    axes = [
+        fig.add_subplot(gs[1:col_1_splits[0], :row_1_splits[0]]),  # example trial plot
+        fig.add_subplot(gs[1:col_1_splits[0], row_1_splits[1]:row_1_splits[2]]),  # example trial legend
+        fig.add_subplot(gs[:col_1_splits[0], row_1_splits[-2]:]),  # recording locations plot
+
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2], :row_2_splits[0]]),  # category bar for heatmap 1
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2], row_2_splits[1]:row_2_splits[2]]),  # heatmap 1
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2], row_2_splits[3]:row_2_splits[4]]),  # colorbar for heatmap 1
+        fig.add_subplot(gs[col_1_splits[1]:col_1_splits[2], row_2_splits[5]:row_2_splits[6]]),
+        # transient averaged from heatmap 1
+
+        fig.add_subplot(gs[col_1_splits[3]:col_1_splits[4], :row_2_splits[0]]),  # category bar for heatmap 2
+        fig.add_subplot(gs[col_1_splits[3]:col_1_splits[4], row_2_splits[1]:row_2_splits[2]]),  # heatmap 2
+        fig.add_subplot(gs[col_1_splits[3]:col_1_splits[4], row_2_splits[3]:row_2_splits[4]]),  # colorbar for heatmap 2
+        fig.add_subplot(gs[col_1_splits[3]:col_1_splits[4], row_2_splits[5]:row_2_splits[6]]),
+        # transient averaged from heatmap 2
+
+        fig.add_subplot(gs[col_2_splits[1]:col_2_splits[2], row_2_splits[-2]:row_2_splits[-1]]),
+        # DA vs. NRI for all animals
+        fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_2_splits[-2]:row_2_splits[-1]]),
+        # DA vs. NRI but split by blocks from all animals
+        fig.add_subplot(gs[col_2_splits[5]:col_2_splits[6],
+                        row_2_splits[-2]:int(row_2_splits[-2] + (row_2_splits[-1] - row_2_splits[-2]) / 2)]) # DA vs. IRI
+
+    ]
+
+    # # remove right and top spines
+    # for ax in axes:
+    #     ax.spines['right'].set_visible(False)
+    #     ax.spines['top'].set_visible(False)
+
+    lettering = 'abcdefghijklmnopqrstuvwxyz'
+    axes_to_letter = [0, 2, 3, 7, 11, 12, 13]
     for i, ax in enumerate(axes_to_letter):
         axes[ax].text(
             0.0, 1.0, lettering[i], transform=(
@@ -665,7 +748,7 @@ def main():
     # --- end of data preparation ---
 
     # --- set up axes and add figures to axes ---
-    axes = setup_axes()
+    axes = setup_axes_v1()
 
     tic = time.time()
     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=axes[0])
@@ -701,7 +784,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    setup_axes_v2()
 
     # animal_str = 'SZ037'
     # # session_name = '2024-01-04T15_49'
