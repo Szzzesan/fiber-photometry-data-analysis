@@ -471,13 +471,19 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
         DA=('DA', 'mean')).reset_index()
     sns.boxplot(data=session_summary_data, x='cat_code', y='DA', color='darkgray', showfliers=False,
                 boxprops=dict(alpha=0.8), width=0.9, ax=axes)
-    animal_order = data.groupby('animal')['DA'].mean().sort_values(ascending=False).index
-    custom_palette = sns.color_palette("hls", n_colors=len(animal_order))
+
     # custom_palette = sns.diverging_palette(10, 240, n=len(animal_order), sep=40, center="light")
-    sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                  hue='animal', alpha=0.8, size=3,
-                  dodge=dodge, hue_order=animal_order, palette=custom_palette,
-                  legend=True, ax=axes)
+    if dodge:
+        sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
+                      hue='animal', alpha=0.8, size=3,
+                      dodge=dodge, legend=True, ax=axes)
+    if not dodge:
+        animal_order = data.groupby('animal')['DA'].mean().sort_values(ascending=False).index
+        custom_palette = sns.color_palette("RdYlBu", n_colors=len(animal_order))
+        sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
+                      hue='animal', alpha=0.8, size=3,
+                      dodge=dodge, hue_order=animal_order, palette=custom_palette,
+                      legend=True, ax=axes)
     axes.set_title('DA vs. NRI')
     axes.set_xlabel('Reward Time from Entry')
     axes.set_ylabel('Mean DA (z-score)')
