@@ -19,6 +19,7 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
 import matplotlib.ticker as mticker
+import cmasher
 
 mpl.rcParams['figure.dpi'] = 300
 
@@ -448,10 +449,10 @@ def figef_DA_vs_NRI(master_df, axes=None):
         return fig, axes
 
 
-def fige_DA_vs_NRI_v2(master_df, axes=None):
+def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
     data = master_df[(master_df['IRI'] > 1)]
     if axes is None:
-        fig, axes = plt.subplots(1, 1, figsize=(10, 3))
+        fig, axes = plt.subplots(1, 1, figsize=(10, 4))
         return_handle = True
     else:
         fig = None
@@ -468,16 +469,23 @@ def fige_DA_vs_NRI_v2(master_df, axes=None):
                                                                                                   'mean')).reset_index()
     animal_summary_data = session_summary_data.groupby(['animal', 'cat_code'], observed=True).agg(
         DA=('DA', 'mean')).reset_index()
-    sns.boxplot(data=session_summary_data, x='cat_code', y='DA', color='lightgray', showfliers=False,
+    sns.boxplot(data=session_summary_data, x='cat_code', y='DA', color='darkgray', showfliers=False,
                 boxprops=dict(alpha=0.8), width=0.9, ax=axes)
-    sns.swarmplot(data=session_summary_data, x='cat_code', y='DA', hue='animal', alpha=0.8, size=3,
-                  legend=False, ax=axes)
-    # sns.scatterplot(data=session_summary_data, x='NRI', y='DA', hue='animal', ax=axes)
-    # axes.scatter(median_NRI, mean_DA, marker='o', markerfacecolor='none', markersize=5, markeredgecolor='k')
+    animal_order = data.groupby('animal')['DA'].mean().sort_values(ascending=False).index
+    custom_palette = sns.color_palette("hls", n_colors=len(animal_order))
+    # custom_palette = sns.diverging_palette(10, 240, n=len(animal_order), sep=40, center="light")
+    sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
+                  hue='animal', alpha=0.8, size=3,
+                  dodge=dodge, hue_order=animal_order, palette=custom_palette,
+                  legend=True, ax=axes)
+    axes.set_title('DA vs. NRI')
+    axes.set_xlabel('Reward Time from Entry')
+    axes.set_ylabel('Mean DA (z-score)')
+    axes.legend(title='Animal', bbox_to_anchor=(1.02, 1), loc='upper left')
     if return_handle:
+        fig.tight_layout()
         fig.show()
         return fig, axes
-    print('hello')
 
 
 def figg_DA_vs_IRI(master_df, axes=None):
@@ -856,5 +864,5 @@ if __name__ == '__main__':
                                                                            day_0='2023-11-30', file_format='parquet')
     # figef_DA_vs_NRI(master_DA_features_df, axes=None)
     # figg_DA_vs_IRI(master_DA_features_df, axes=None)
-    fige_DA_vs_NRI_v2(master_DA_features_df, axes=None)
+    fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
     print("hello")
