@@ -148,7 +148,9 @@ def resample_data_for_heatmap(zscore, reward_df, cutoff_pre_reward=-0.5, cutoff_
 
     if category_by == 'time_in_port':
         bins = [0, 2, 6, 14, np.inf]
+        bins = [0, 1.8, 4, 7.5, 12, np.inf]
         cat_labels = ['0-2 s', '2-6 s', '6-14 s', '>14 s']
+        cat_labels = ['0-1.8 s', '1.8-4 s', '4-7.5 s', '7.5-12 s', '>12 s']
         valid_df['cat_code'] = pd.cut(valid_df['time_in_port'], bins=bins, labels=False, right=False)
         sorted_df = valid_df.sort_values(by='time_in_port').reset_index(drop=True)
     elif category_by == 'block':
@@ -281,7 +283,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
 
     # ax_cbar.tick_params(width=0.3, length=0.8, labelsize=4, direction='in', color='white')
     # ax_cbar.set_title('DA\n(z-score)', fontsize='small', pad=0) # if label on top
-    ax_cbar.set_ylabel('DA (z-score)', fontsize='small', rotation=-90, labelpad=-4, va="bottom") # if label on the side
+    ax_cbar.set_ylabel('DA (z-score)', fontsize='small', rotation=-90, labelpad=-4, va="bottom")  # if label on the side
     ax_cbar.tick_params(direction='in', color='white', labelsize='small')
 
     # Customize the x-axis ticks to show time in seconds
@@ -444,6 +446,38 @@ def figef_DA_vs_NRI(master_df, axes=None):
     if return_handle:
         fig.show()
         return fig, axes
+
+
+def fige_DA_vs_NRI_v2(master_df, axes=None):
+    data = master_df[(master_df['IRI'] > 1)]
+    if axes is None:
+        fig, axes = plt.subplots(1, 1, figsize=(10, 3))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+
+    # categorize the data into different groups of NRI
+    # bins = helper.get_equal_area_bins(num_bins=10, cumulative=8.0, starting=1.0)
+    bins = [0, 0.8, 1.8, 2.9, 4.1, 5.5, 7.3, 9.6, np.inf]
+    bin_labels = [f'{bins[i]}-{bins[i + 1]}' for i in range(len(bins) - 1)]
+    bin_labels[-1] = f'>{bins[-2]}'
+    data['cat_code'] = pd.cut(data['NRI'], bins=bins)
+    session_summary_data = data.groupby(['animal', 'session', 'cat_code'], observed=True).agg(NRI=('NRI', 'mean'),
+                                                                                              DA=('DA',
+                                                                                                  'mean')).reset_index()
+    animal_summary_data = session_summary_data.groupby(['animal', 'cat_code'], observed=True).agg(
+        DA=('DA', 'mean')).reset_index()
+    sns.boxplot(data=session_summary_data, x='cat_code', y='DA', color='lightgray', showfliers=False,
+                boxprops=dict(alpha=0.8), width=0.9, ax=axes)
+    sns.swarmplot(data=session_summary_data, x='cat_code', y='DA', hue='animal', alpha=0.8, size=3,
+                  legend=False, ax=axes)
+    # sns.scatterplot(data=session_summary_data, x='NRI', y='DA', hue='animal', ax=axes)
+    # axes.scatter(median_NRI, mean_DA, marker='o', markerfacecolor='none', markersize=5, markeredgecolor='k')
+    if return_handle:
+        fig.show()
+        return fig, axes
+    print('hello')
 
 
 def figg_DA_vs_IRI(master_df, axes=None):
@@ -645,7 +679,8 @@ def setup_axes_v2():
         fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_2_splits[-2]:row_2_splits[-1]]),
         # DA vs. NRI but split by blocks from all animals
         fig.add_subplot(gs[col_2_splits[5]:col_2_splits[6],
-                        row_2_splits[-2]:int(row_2_splits[-2] + (row_2_splits[-1] - row_2_splits[-2]) / 2)]) # DA vs. IRI
+                        row_2_splits[-2]:int(row_2_splits[-2] + (row_2_splits[-1] - row_2_splits[-2]) / 2)])
+        # DA vs. IRI
 
     ]
 
@@ -785,7 +820,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
 
     # animal_str = 'SZ037'
     # # session_name = '2024-01-04T15_49'
@@ -815,9 +850,11 @@ if __name__ == '__main__':
     #     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
     #                                  axes=None)
 
-    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    # # animal_ids = ["SZ036"]
-    # master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features', 'parquet')
+    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # animal_ids = ["SZ036"]
+    master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+                                                                           day_0='2023-11-30', file_format='parquet')
     # figef_DA_vs_NRI(master_DA_features_df, axes=None)
     # figg_DA_vs_IRI(master_DA_features_df, axes=None)
+    fige_DA_vs_NRI_v2(master_DA_features_df, axes=None)
     print("hello")
