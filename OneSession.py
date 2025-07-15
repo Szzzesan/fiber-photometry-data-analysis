@@ -1278,6 +1278,7 @@ class OneSession:
                                                         ani_str=self.animal,
                                                         ses_str=self.signal_dir[-21:-7])
         df = df_IRI_exp
+        df = df[df['IRI_post'] > 0.5].reset_index(drop=True)
 
         arr_NRI = df['time_in_port'].to_numpy()
         arr_IRI = df['IRI_prior'].to_numpy()
@@ -1474,7 +1475,7 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('RK010', 13, include_branch='both', port_swap=0)
+    test_session = OneSession('SZ036', 13, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.save_dFF0_and_zscore(format='parquet')
