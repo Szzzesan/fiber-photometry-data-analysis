@@ -1475,17 +1475,17 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ036', 13, include_branch='both', port_swap=0)
+    test_session = OneSession('SZ036', 12, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
-    # test_session.save_dFF0_and_zscore(format='parquet')
+    test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
-    # test_session.save_pi_events(format='parquet')
+    test_session.save_pi_events(format='parquet')
     test_session.construct_trial_df()
-    # test_session.save_trial_df(format='parquet')
+    test_session.save_trial_df(format='parquet')
     test_session.construct_expreward_interval_df()
-    # test_session.save_expreward_df(format='parquet')
+    test_session.save_expreward_df(format='parquet')
     # test_session.extract_bg_behav_by_trial()
     # test_session.plot_reward_aligned_lick_histograms()
     # test_session.calculate_lick_rates_around_bg_reward(reward_idx_to_align=2, plot_comparison=1)
