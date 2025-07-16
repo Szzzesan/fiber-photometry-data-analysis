@@ -104,7 +104,7 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, file_format='
         search_path = os.path.join(processed_dir, f"*_{df_name}.{file_format}")
         session_files = glob.glob(search_path)
         if not session_files:
-            print(f"ℹ️ Info: No '{df_name}' files found for animal {animal} in {processed_dir}")
+            print(f"Info: No '{df_name}' files found for animal {animal} in {processed_dir}")
             continue
 
         animal_session_info = []
