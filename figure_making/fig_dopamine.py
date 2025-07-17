@@ -6,6 +6,7 @@ import helper
 
 import numpy as np
 import pandas as pd
+from collections import defaultdict
 
 from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
@@ -110,11 +111,11 @@ def figa_example_trial_legend(ax=None):
     # handler_map={plt.Line2D: plotting_utils.HandlerMiniatureLine()})
 
     # make the lines in the legend vertical
-    legend.legendHandles[0].set_data([8, 8], [-1, 8])
-    legend.legendHandles[1].set_data([8, 8], [0, 6])
-    legend.legendHandles[2].set_data([8, 8], [-1, 8])
-    legend.legendHandles[3].set_data([8, 8], [0, 6])
-    legend.legendHandles[3].set_linewidth(1)
+    legend.legend_handles[0].set_data([8, 8], [-1, 8])
+    legend.legend_handles[1].set_data([8, 8], [0, 6])
+    legend.legend_handles[2].set_data([8, 8], [-1, 8])
+    legend.legend_handles[3].set_data([8, 8], [0, 6])
+    legend.legend_handles[3].set_linewidth(1)
     # legend.legendHandles[6].set_data([2, 14], [3, 3])
 
     ax.axis('off')
@@ -148,10 +149,12 @@ def resample_data_for_heatmap(zscore, reward_df, cutoff_pre_reward=-0.5, cutoff_
         reward_df['time_in_port'].notna() & (reward_df['IRI_prior'] > 1) & (reward_df['IRI_post'] >= 0.6)]
 
     if category_by == 'time_in_port':
-        bins = [0, 2, 6, 14, np.inf]
-        bins = [0, 1.8, 4, 7.5, 12, np.inf]
-        cat_labels = ['0-2 s', '2-6 s', '6-14 s', '>14 s']
-        cat_labels = ['0-1.8 s', '1.8-4 s', '4-7.5 s', '7.5-12 s', '>12 s']
+        # bins = [0, 2, 4.3, 7.3, np.inf] # this works
+        bins = [0, 2.2, 4.5, 7.5,
+                np.inf]  # this (or change the second number to 2.25) also works, and it divides the instances into more even groups
+        # bins = [0, 2, 5, np.inf]
+        cat_labels = [f'{bins[i]}-{bins[i + 1]}' for i in range(len(bins) - 1)]
+        cat_labels[-1] = f'>{bins[-2]}'
         valid_df['cat_code'] = pd.cut(valid_df['time_in_port'], bins=bins, labels=False, right=False)
         sorted_df = valid_df.sort_values(by='time_in_port').reset_index(drop=True)
     elif category_by == 'block':
@@ -257,7 +260,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
             return fig, ax_heatmap
 
     cat_num = len(cat_labels)
-    palette_to_use = list(sns.color_palette(palette, n_colors=cat_num))
+    palette_to_use = list(sns.color_palette(palette, n_colors=cat_num + 1))[:cat_num]
     custom_cat_cmap = ListedColormap(palette_to_use)
 
     nodes = [0.0, 0.5, 0.75, 1.0]
@@ -305,9 +308,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
 
     # plot mean traces and their error bands from each category
     cat_num = len(cat_labels)
-    if cat_num > 2:
-        cat_labels_to_use = cat_labels[:-1]
-    elif cat_num == 2:
+    if cat_num >= 2:
         cat_labels_to_use = cat_labels
     else:
         raise ValueError("cat_labels must contain at least 2 elements.")
@@ -316,13 +317,15 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
         lower_bound = stats[label]['lower_bound']
         upper_bound = stats[label]['upper_bound']
         ax_mean.plot(time_vector, stats[label]['mean'], label=label, color=palette_to_use[i])
-        ax_mean.fill_between(time_vector, lower_bound, upper_bound, color=palette_to_use[i], alpha=0.2)
+        ax_mean.fill_between(time_vector, lower_bound, upper_bound, color=palette_to_use[i], alpha=0.2,
+                             edgecolor='none')
     ax_mean.spines['top'].set_visible(False)
     ax_mean.spines['right'].set_visible(False)
     # ax_mean.set_xticks(xtick_positions)
     ax_mean.set_xlim([cutoff_pre_reward, cutoff_post_reward])
     ax_mean.set_xticks(xtick_labels)
     ax_mean.xaxis.set_major_formatter(mticker.FormatStrFormatter('%g'))
+    ax_mean.set_ylim([-1.6, 3.7])
     ax_mean.set_ylabel('Mean DA (z-score)', labelpad=-6, y=0.55)
     ax_mean.legend(title=legend_title,
                    prop={'weight': 'normal', 'size': 'small'},
@@ -364,20 +367,25 @@ def figd_example_session_heatmap_split_by_block(zscore, reward_df, axes=None):
 def get_mean_sem_DA_for_feature(df, var='NRI', sample_per_bin=250):
     df_sorted = df.sort_values(by=var).reset_index(drop=True)
     total_sample = len(df_sorted)
-    bin_num = int(total_sample / sample_per_bin)
+    complete_bin = int(total_sample / sample_per_bin)
+    bin_num = complete_bin
+    if total_sample % sample_per_bin >= 20:
+        bin_num += 1
     arr_bin_center = np.zeros(bin_num)
     arr_mean = np.zeros(bin_num)
     arr_sem = np.zeros(bin_num)
-    for i in range(bin_num):
+    for i in range(complete_bin):
         arr_bin_center[i] = (df_sorted.iloc[sample_per_bin * i][var] + df_sorted.iloc[sample_per_bin * (i + 1) - 1][
             var]) / 2
         arr_mean[i] = df_sorted.iloc[sample_per_bin * i:sample_per_bin * (i + 1)]['DA'].mean()
         arr_sem[i] = df_sorted.iloc[sample_per_bin * i:sample_per_bin * (i + 1)]['DA'].sem()
+    if total_sample % sample_per_bin >= 20:
+        arr_bin_center[-1] = (df_sorted.iloc[sample_per_bin * complete_bin][var] + df_sorted.iloc[-1][var]) / 2
+        arr_mean[-1] = df_sorted.iloc[sample_per_bin * complete_bin:]['DA'].mean()
+        arr_sem[-1] = df_sorted.iloc[sample_per_bin * complete_bin:]['DA'].sem()
     mean_sem_df = pd.DataFrame({'bin_center': arr_bin_center, 'mean': arr_mean, 'sem': arr_sem})
     return mean_sem_df
 
-
-# def make_scatter_plot(df, x_var, y_var):
 
 def figef_DA_vs_NRI(master_df, axes=None):
     data = master_df[(master_df['IRI'] > 1)]
@@ -449,8 +457,41 @@ def figef_DA_vs_NRI(master_df, axes=None):
         return fig, axes
 
 
+def _prepare_binned_data(master_df, group_by_cols):
+    data = master_df[master_df['IRI'] > 1].copy()
+    bins = [0, 0.8, 1.8, 2.9, 4.1, 5.5, 7.3, 9.6, np.inf]
+    bin_labels = [f'{bins[i]}-{bins[i + 1]}' for i in range(len(bins) - 1)]
+    bin_labels[-1] = f'>{bins[-2]}'
+    data['cat_code'] = pd.cut(data['NRI'], bins=bins, labels=bin_labels)
+    summary_data = data.groupby(group_by_cols, observed=True).agg(
+        NRI=('NRI', 'mean'),
+        DA=('DA', 'mean')
+    ).reset_index()
+    return summary_data
+
+
+def _set_axes_for_box_and_swarm(axes):
+    axes.set_xticklabels(axes.get_xticklabels(), rotation=15, ha='right')
+    # axes.set_title('DA vs. NRI', pad=-5)
+    axes.set_xlabel('Reward Time from Entry (s)', labelpad=2)
+    axes.set_ylabel('Mean DA (z-score)')
+    axes.spines['right'].set_visible(False)
+    axes.spines['top'].set_visible(False)
+    # axes.legend(title='Animal', bbox_to_anchor=(1.02, 1), loc='upper left')
+
+    # axes.legend(
+    #     title='Animal',
+    #     bbox_to_anchor=(0.01, 1),
+    #     loc='upper left',
+    #     fontsize='x-small',  # Smaller font for legend labels
+    #     title_fontsize='10',  # Smaller font for the title
+    #     labelspacing=0.4,  # Less vertical space between entries
+    #     handletextpad=0.3,  # Less space between the color handle and the text
+    #     borderpad=0.1  # Less padding inside the legend box border
+    # )
+
+
 def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
-    data = master_df[(master_df['IRI'] > 1)]
     if axes is None:
         fig, axes = plt.subplots(1, 1, figsize=(10, 4))
         return_handle = True
@@ -458,36 +499,154 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
         fig = None
         return_handle = False
 
-    # categorize the data into different groups of NRI
-    # bins = helper.get_equal_area_bins(num_bins=10, cumulative=8.0, starting=1.0)
-    bins = [0, 0.8, 1.8, 2.9, 4.1, 5.5, 7.3, 9.6, np.inf]
-    bin_labels = [f'{bins[i]}-{bins[i + 1]}' for i in range(len(bins) - 1)]
-    bin_labels[-1] = f'>{bins[-2]}'
-    data['cat_code'] = pd.cut(data['NRI'], bins=bins)
-    session_summary_data = data.groupby(['animal', 'session', 'cat_code'], observed=True).agg(NRI=('NRI', 'mean'),
-                                                                                              DA=('DA',
-                                                                                                  'mean')).reset_index()
-    animal_summary_data = session_summary_data.groupby(['animal', 'cat_code'], observed=True).agg(
-        DA=('DA', 'mean')).reset_index()
-    sns.boxplot(data=session_summary_data, x='cat_code', y='DA', color='darkgray', showfliers=False,
-                boxprops=dict(alpha=0.8), width=0.9, ax=axes)
+    session_summary_data = _prepare_binned_data(master_df, ['animal', 'session', 'cat_code'])
 
-    # custom_palette = sns.diverging_palette(10, 240, n=len(animal_order), sep=40, center="light")
-    if dodge:
+    sns.boxplot(data=session_summary_data, x='cat_code', y='DA', linewidth=1, showfliers=False,
+                notch=True, width=0.9,
+                boxprops=dict(facecolor='lightgrey', alpha=0.4),
+                medianprops={'linewidth': 2, 'color': 'black'},
+                ax=axes)
+
+    for patch in axes.patches:
+        r, g, b, a = patch.get_facecolor()
+        patch.set_facecolor((r, g, b, 0.6))
+
+    if dodge:  # then use the default color palette for categorical variable
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', alpha=0.8, size=3,
-                      dodge=dodge, legend=True, ax=axes)
-    if not dodge:
-        animal_order = data.groupby('animal')['DA'].mean().sort_values(ascending=False).index
+                      hue='animal', size=1.5,
+                      dodge=dodge, legend=False, ax=axes,
+                      linewidth=0.5,
+                      edgecolor='face')
+    if not dodge:  # use the diverging color palette of our preference
+        animal_order = session_summary_data.groupby('animal')['DA'].mean().sort_values(ascending=False).index
         custom_palette = sns.color_palette("RdYlBu", n_colors=len(animal_order))
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', alpha=0.8, size=3,
-                      dodge=dodge, hue_order=animal_order, palette=custom_palette,
-                      legend=True, ax=axes)
-    axes.set_title('DA vs. NRI')
-    axes.set_xlabel('Reward Time from Entry')
-    axes.set_ylabel('Mean DA (z-score)')
-    axes.legend(title='Animal', bbox_to_anchor=(1.02, 1), loc='upper left')
+                      hue='animal', size=2,
+                      dodge=dodge, hue_order=animal_order, palette='cmr.guppy',
+                      legend=False, ax=axes,
+                      linewidth=0.75,
+                      edgecolor='face')
+    fill_alpha = 0.5
+    for collection in axes.collections:
+        face_colors = collection.get_facecolors()
+        face_colors[:, 3] = fill_alpha
+        collection.set_facecolors(face_colors)
+    _set_axes_for_box_and_swarm(axes)
+    # axes.legend(title='Animal', bbox_to_anchor=(1.02, 1), loc='upper left')
+
+    # axes.legend(
+    #     title='Animal',
+    #     bbox_to_anchor=(0.01, 1),
+    #     loc='upper left',
+    #     fontsize='x-small',  # Smaller font for legend labels
+    #     title_fontsize='10',  # Smaller font for the title
+    #     labelspacing=0.4,  # Less vertical space between entries
+    #     handletextpad=0.3,  # Less space between the color handle and the text
+    #     borderpad=0.1  # Less padding inside the legend box border
+    # )
+    if return_handle:
+        fig.tight_layout()
+        fig.show()
+        return fig, axes
+
+
+def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
+    if axes is None:
+        fig, axes = plt.subplots(1, 1, figsize=(10, 4))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+
+    session_summary_data = _prepare_binned_data(master_df, ['session', 'cat_code', 'block'])
+    block_palette = sns.color_palette('Set2', 2)
+    hue_order = ['0.4', '0.8']
+    custom_palette = {'0.4': block_palette[0], '0.8': block_palette[1]}
+    sns.boxplot(data=session_summary_data, x='cat_code', y='DA', hue='block', notch=True, gap=0.1,
+                hue_order=hue_order, palette=custom_palette,
+                boxprops=dict(alpha=0.4),
+                medianprops={'linewidth': 1, 'color': 'black'},
+                legend=False,
+                showfliers=False, ax=axes)
+
+    std = session_summary_data.groupby(['cat_code', 'block'])['DA'].transform('std')
+    mean = session_summary_data.groupby(['cat_code'])['DA'].transform('mean')
+    lower_bound = mean - 3 * std
+    upper_bound = mean + 3 * std
+    swarm_data = session_summary_data[
+        (session_summary_data['DA'] > lower_bound) & (session_summary_data['DA'] < upper_bound)]
+    # custom_palette = {'0.4': sns.color_palette('colorblind')[0], '0.8': sns.color_palette('colorblind')[3]}
+    sns.swarmplot(data=swarm_data, x='cat_code', y='DA', hue='block',
+                  size=1, palette=custom_palette,
+                  dodge=True, legend=False, ax=axes,
+                  linewidth=0.5,
+                  edgecolor='face')
+    fill_alpha = 0.5
+    for collection in axes.collections:
+        face_colors = collection.get_facecolors()
+        face_colors[:, 3] = fill_alpha
+        collection.set_facecolors(face_colors)
+    _set_axes_for_box_and_swarm(axes)
+
+    # handles, _ = axes.get_legend_handles_labels()
+    # new_labels = ['Low', 'High']
+    # # axes.legend(handles, new_labels, title='Context\nReward Rate', bbox_to_anchor=(1.02, 1), loc='upper left')
+    # axes.legend(
+    #     handles,
+    #     new_labels,
+    #     title='Block',
+    #     bbox_to_anchor=(0.01, 1),
+    #     loc='upper left',
+    #     fontsize='x-small',  # Smaller font for legend labels
+    #     title_fontsize='10',  # Smaller font for the title
+    #     labelspacing=0.4,  # Less vertical space between entries
+    #     handletextpad=0.3,  # Less space between the color handle and the text
+    #     borderpad=0.1  # Less padding inside the legend box border
+    # )
+
+    if return_handle:
+        fig.tight_layout()
+        fig.show()
+        return fig, axes
+
+
+def figg_DA_vs_IRI_v2(master_df, IRI_group_size=50, axes=None):
+    data = master_df[master_df['NRI'] >= master_df['IRI']]
+    # data = master_df
+    if axes is None:
+        fig, axes = plt.subplots(1, 1, figsize=(5, 4))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+
+    # bins = [0, 0.8, 1.8, 2.9, 4.1, 5.5, 7.3, 9.6, np.inf]
+    bins = [0, 2, 5, np.inf]
+    bin_labels = [f'{bins[i]}-{bins[i + 1]}' for i in range(len(bins) - 1)]
+    bin_labels[-1] = f'>{bins[-2]}'
+    data['cat_code'] = pd.cut(data['NRI'], bins=bins, labels=bin_labels)
+    data_plot = defaultdict(pd.DataFrame)
+    for cat in bin_labels:
+        subset = data[data['cat_code'] == cat]
+        mean_sem = get_mean_sem_DA_for_feature(subset, var='IRI', sample_per_bin=IRI_group_size)
+        data_plot[cat] = mean_sem
+    for cat in bin_labels:
+        x = data_plot[cat]['bin_center']
+        y = data_plot[cat]['mean']
+        y_err = data_plot[cat]['sem']
+        line = axes.plot(x, y, linewidth=0.5, label=cat)
+        axes.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.4, edgecolor='none')
+    axes.set_ylim([1.6, 4.1])
+    # axes.set_title('DA vs. IRI Split by NRI Groups')
+    axes.set_xlabel('Reward Time from Prior Reward (s)')
+    axes.set_ylabel('Mean DA (z-score)', y=0.2)
+    axes.spines['top'].set_visible(False)
+    axes.spines['right'].set_visible(False)
+    axes.legend(title='Reward Time from Entry (s)',
+                title_fontsize='x-small',
+                fontsize='x-small',
+                ncol=3)
+
     if return_handle:
         fig.tight_layout()
         fig.show()
@@ -639,7 +798,7 @@ def setup_axes_v2():
     row_1 = [8, 1, 2]
     row_2 = [1, 15, 2, 15, 30]
     col_1 = [1, 2, 2]
-    col_2 = [1, 1, 1]
+    col_2 = [2, 2, 1]
 
     row_1_margins = [4, 6]
     row_2_margins = [1, 1, 10, 8]
@@ -693,7 +852,7 @@ def setup_axes_v2():
         fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_2_splits[-2]:row_2_splits[-1]]),
         # DA vs. NRI but split by blocks from all animals
         fig.add_subplot(gs[col_2_splits[5]:col_2_splits[6],
-                        row_2_splits[-2]:int(row_2_splits[-2] + (row_2_splits[-1] - row_2_splits[-2]) / 2)])
+                        row_2_splits[-2]:row_2_splits[-1]])
         # DA vs. IRI
 
     ]
@@ -766,7 +925,7 @@ def main():
 
     # --- good example sessions for heatmaps ---
     # animal SZ036
-    # '2024-01-03T16_13'
+    # '2024-01-03T16_13' (this one)
     # '2024-01-04T11_40'
     # animal SZ037
     # '2024-01-04T12_45'
@@ -785,8 +944,8 @@ def main():
     trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
                                                   file_format='parquet')
 
-    animal_str = 'SZ037'
-    session_name = '2024-01-04T12_45'
+    animal_str = 'SZ036'
+    session_name = '2024-01-03T16_13'
     zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
                                                         file_format='parquet')
     reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
@@ -794,7 +953,8 @@ def main():
 
     animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # animal_ids=["SZ036"]
-    master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features', 'parquet')
+    master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+                                                                           day_0='2023-11-30', file_format='parquet')
     # --- end of data preparation ---
 
     # --- set up axes and add figures to axes ---
@@ -814,12 +974,33 @@ def main():
     print(f'figd_example_session_heatmap_split_by_block took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    figef_DA_vs_NRI(master_DA_features_df, axes=axes[11:13])
-    print(f'figef_DA_vs_NRI took {time.time() - tic:.2f} seconds')
+    fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=axes[11])
+    print(f'fige_DA_vs_NRI_v2 took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    figg_DA_vs_IRI(master_DA_features_df, axes=axes[13])
-    print(f'figg_DA_vs_IRI took {time.time() - tic:.2f} seconds')
+    figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=axes[12])
+    print(f'figf_DA_vs_NRI_block_split_v2 took {time.time() - tic:.2f} seconds')
+
+    tic = time.time()
+    figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=200, axes=axes[13])
+    print(f'figg_DA_vs_IRI_v2 took {time.time() - tic:.2f} seconds')
+
+    y_limits = []
+    for ax in axes[11:13]:
+        y_limits.extend(ax.get_ylim())
+    global_y_min = min(y_limits)
+    global_y_max = max(y_limits)
+    # print(f'lower bound of y: {global_y_min}; upper bound of y: {global_y_max}')
+    for ax in axes[11:13]:
+        ax.set_ylim(global_y_min, global_y_max)
+
+    # tic = time.time()
+    # figef_DA_vs_NRI(master_DA_features_df, axes=axes[11:13])
+    # print(f'figef_DA_vs_NRI took {time.time() - tic:.2f} seconds')
+    #
+    # tic = time.time()
+    # figg_DA_vs_IRI(master_DA_features_df, axes=axes[13])
+    # print(f'figg_DA_vs_IRI took {time.time() - tic:.2f} seconds')
 
     plt.subplots_adjust(hspace=0, wspace=0)  # left=0.07, right=0.98, bottom=0.15, top=0.9
     plt.show()
@@ -828,13 +1009,13 @@ def main():
 
     # --- go through all the trials in one session when looking for good trials ---
     # for trial_id in trial_df['trial'].values:
-    #     figc_example_1d_traces(zscore, trial_df, example_trial_id=trial_id, ax=None)
-    #     time.sleep(2) # Pause for 2 seconds between each plot to respect the server's rate limit
+    #     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=trial_id, ax=None)
+    #     time.sleep(2)  # Pause for 2 seconds between each plot to respect the server's rate limit
     # --- end ---
 
 
 if __name__ == '__main__':
-    # main()
+    main()
 
     # animal_str = 'SZ037'
     # # session_name = '2024-01-04T15_49'
@@ -864,11 +1045,14 @@ if __name__ == '__main__':
     #     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
     #                                  axes=None)
 
-    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    # animal_ids = ["SZ036"]
-    master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                           day_0='2023-11-30', file_format='parquet')
-    # figef_DA_vs_NRI(master_DA_features_df, axes=None)
-    # figg_DA_vs_IRI(master_DA_features_df, axes=None)
-    fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
+    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # # animal_ids = ["SZ036"]
+    # master_DA_features_df = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                                        day_0='2023-11-30', file_format='parquet')
+    # # # figef_DA_vs_NRI(master_DA_features_df, axes=None)
+    # # # figg_DA_vs_IRI(master_DA_features_df, axes=None)
+    # # fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
+    # # figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=None)
+    # figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=300, axes=None)
+
     print("hello")
