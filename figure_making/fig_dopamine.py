@@ -340,6 +340,161 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
         fig.show()
 
 
+def plot_heatmap_and_scatters(time_vector, category_codes, cat_labels, heatmap_matrix, DA_features_df,
+                              palette='Reds_r',
+                              split_cat=0,
+                              legend_title='Time in Port', axes=None):
+    """
+    This function takes in prepared data and plot a heatmap and a plot with mean traces and error bands side by side
+    """
+    if heatmap_matrix.size == 0:
+        print("No data to plot after filtering.")
+        return None, None
+    # --- 1. Calculate mean and sems ---
+    stats = {}
+    for i, label in enumerate(cat_labels):
+        sub_matrix = heatmap_matrix[category_codes == i]
+        if sub_matrix.shape[0] > 0:
+            mean_trace = np.nanmean(sub_matrix, axis=0)
+            std_trace = np.nanstd(sub_matrix, axis=0)
+            n_samples = np.sum(~np.isnan(sub_matrix), axis=0)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                sem_trace = std_trace / np.sqrt(n_samples)
+                sem_trace[np.isnan(sem_trace)] = 0
+            stats[label] = {
+                'mean': mean_trace, 'sem': sem_trace,
+                'upper_bound': mean_trace + sem_trace,
+                'lower_bound': mean_trace - sem_trace,
+                'n_trials': sub_matrix.shape[0]
+            }
+    # --- New 1. Get bin averaged DA amplitude vs. NRI ---
+    mean_sem = get_mean_sem_DA_for_feature(DA_features_df, var='NRI', sample_per_bin=600)
+
+    # --- 2. Prepare axes/grids ---
+    if axes is None:
+        fig = plt.figure(figsize=(6, 3))
+        gs_outer = GridSpec(1, 2, width_ratios=[21.5, 20], wspace=0.3)
+        gs_inner = GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_outer[0], width_ratios=[0.5, 20, 1], wspace=0.05)
+        ax_bars = fig.add_subplot(gs_inner[0, 0])
+        ax_heatmap = fig.add_subplot(gs_inner[0, 1])
+        ax_cbar = fig.add_subplot(gs_inner[0, 2])
+        ax_mean = fig.add_subplot(gs_outer[0, 1])
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+        ax_bars = axes[0]
+        ax_heatmap = axes[1]
+        ax_cbar = axes[2]
+        ax_mean = axes[3]
+
+    # --- 3. Plotting ---
+    if split_cat:  # whether to add a blank space between different categories
+        change_indices = np.where(np.diff(category_codes) != 0)[0] + 1
+        for i in reversed(change_indices):
+            heatmap_matrix = np.insert(heatmap_matrix, i, np.nan, axis=0)
+            category_codes = np.insert(category_codes, i, np.nan)
+
+    if np.all(np.isnan(heatmap_matrix)):
+        print("No valid epochs were found to plot.")
+        ax_heatmap.text(0.5, 0.5, 'No Data', ha='center', va='center')
+        if return_handle:
+            fig.show()
+            return fig, ax_heatmap
+
+    cat_num = len(cat_labels)
+    palette_to_use = list(sns.color_palette(palette, n_colors=cat_num + 1))[:cat_num]
+    custom_cat_cmap = ListedColormap(palette_to_use)
+
+    nodes = [0.0, 0.5, 0.75, 1.0]
+    colors = ["blue", "black", "red", "yellow"]
+    custom_cmap = LinearSegmentedColormap.from_list("my_cmap", list(zip(nodes, colors)))
+
+    # Plot the category bars on the left axis (ax_bars)
+    category_matrix = category_codes[:, np.newaxis]  # Reshape for heatmap
+    # Use 'Reds_r' to go from dark red (low NRIs) to light red (high NRIs)
+    # Use 'Set2' to distinguish low block and high block
+    sns.heatmap(category_matrix, ax=ax_bars, cmap=custom_cat_cmap, cbar=False, xticklabels=False, yticklabels=False)
+    ax_bars.set_ylabel(None)  # Remove any potential labels
+
+    # Plot main heatmap
+    sns.heatmap(
+        heatmap_matrix,
+        ax=ax_heatmap,
+        cmap=custom_cmap,
+        center=0,
+        cbar=True,
+        yticklabels=False,
+        cbar_ax=ax_cbar,
+    )
+
+    # ax_cbar.tick_params(width=0.3, length=0.8, labelsize=4, direction='in', color='white')
+    # ax_cbar.set_title('DA\n(z-score)', fontsize='small', pad=0) # if label on top
+    ax_cbar.set_ylabel('DA (z-score)', fontsize='small', rotation=-90, labelpad=-4, va="bottom")  # if label on the side
+    ax_cbar.tick_params(direction='in', color='white', labelsize='small')
+
+    # Customize the x-axis ticks to show time in seconds
+    cutoff_pre_reward = round(time_vector[0], 1)
+    cutoff_post_reward = round(time_vector[-1], 1)
+    bin_size_s = round((time_vector[-1] - time_vector[0]) / (len(time_vector) - 1), 2)
+    xtick_labels = [cutoff_pre_reward, 0, 1, int(cutoff_post_reward)]
+    xtick_positions = [
+        0,  # Start position
+        np.abs(time_vector - 0).argmin(),  # Position of zero
+        np.abs(time_vector - 0).argmin() + int(1 / bin_size_s),  # Position of one
+        len(time_vector) - 1  # End position
+    ]
+
+    ax_heatmap.set_xticks(xtick_positions)
+    ax_heatmap.set_xticklabels(xtick_labels, rotation=0)
+    ax_heatmap.set_ylabel(None)
+
+    # plot scatters of DA amplitude vs. Reward Time from Entry
+    cat_num = len(cat_labels)
+    if cat_num >= 2:
+        cat_labels_to_use = cat_labels
+    else:
+        raise ValueError("cat_labels must contain at least 2 elements.")
+
+    # for i, label in enumerate(cat_labels_to_use):
+    #     lower_bound = stats[label]['lower_bound']
+    #     upper_bound = stats[label]['upper_bound']
+    #     ax_mean.plot(time_vector, stats[label]['mean'], label=label, color=palette_to_use[i])
+    #     ax_mean.fill_between(time_vector, lower_bound, upper_bound, color=palette_to_use[i], alpha=0.2,
+    #                          edgecolor='none')
+    sns.scatterplot(DA_features_df, x='NRI', y='DA', marker='.', colors='DarkGray', s=5, ax=ax_mean)
+
+    ax_mean.spines['top'].set_visible(False)
+    ax_mean.spines['right'].set_visible(False)
+    # ax_mean.set_xticks(xtick_positions)
+    # ax_mean.set_xlim([cutoff_pre_reward, cutoff_post_reward])
+    # ax_mean.set_xticks(xtick_labels)
+    # ax_mean.xaxis.set_major_formatter(mticker.FormatStrFormatter('%g'))
+    # ax_mean.set_ylim([-1.6, 3.7])
+    ax_mean.set_ylabel('DA (z-score)', labelpad=-6, y=0.55)
+    # ax_mean.legend(title=legend_title,
+    #                prop={'weight': 'normal', 'size': 'small'},
+    #                title_fontproperties={'weight': 'normal', 'size': 'small'},
+    #                handlelength=1, borderpad=0.4)
+
+    for ax in [ax_heatmap, ax_mean]:
+        ax.set_xlabel('Time from Reward (s)')
+
+    if return_handle:
+        fig.tight_layout()
+        fig.show()
+
+
+def figc_example_session_heatmap_split_by_NRI_v2(zscore, reward_df, DA_features_df, axes=None):
+    time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
+        zscore, reward_df,
+        cutoff_pre_reward=-0.5,
+        cutoff_post_reward=2,
+        bin_size_s=0.05,
+        category_by='time_in_port'
+    )
+
+
 def figc_example_session_heatmap_split_by_NRI(zscore, reward_df, axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
         zscore, reward_df,
@@ -950,6 +1105,8 @@ def main():
                                                         file_format='parquet')
     reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
                                                    file_format='parquet')
+    DA_features_df = data_loader.load_session_dataframe(animal_str, 'DA_vs_features', session_long_name=session_name,
+                                                        file_format='parquet')
 
     animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # animal_ids=["SZ036"]
