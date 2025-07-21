@@ -368,7 +368,7 @@ def plot_DA_vs_NRI_scatters_with_average_curve(master_df, split_block=0, axes=No
             subset = data[data['block'] == block].copy()
             subset['jittered_NRI'] = subset['NRI'] + np.random.normal(0, jitter_amount, size=len(subset))
             sns.scatterplot(data=subset, x='jittered_NRI', y='DA', color=color, legend=False, s=5,
-                            edgecolor='none', labe=label, ax=ax)
+                            edgecolor='none', label=label, ax=ax)
             ax.legend(title='Context\nReward Rate', fontsize='small')
 
     # df_plot = get_mean_sem_DA_for_feature(subset, var='NRI', sample_per_bin=300)
@@ -396,7 +396,6 @@ def plot_DA_vs_NRI_scatters_with_average_curve(master_df, split_block=0, axes=No
 def plot_heatmap_and_scatters(time_vector, category_codes, cat_labels, heatmap_matrix, DA_features_df,
                               palette='Reds_r',
                               split_cat=0,
-                              density=0,
                               split_by_block=0,
                               axes=None):
     """
@@ -505,7 +504,6 @@ def figc_example_session_heatmap_split_by_NRI_v2(zscore, reward_df, DA_features_
     plot_heatmap_and_scatters(time_vec, cat_codes, cat_labels, heatmap_mat, DA_features_df,
                               palette='Reds_r',
                               split_cat=0,
-                              density=0,
                               split_by_block=0,
                               axes=axes)
 
@@ -522,6 +520,20 @@ def figc_example_session_heatmap_split_by_NRI(zscore, reward_df, axes=None):
                                  legend_title='Reward Time\nfrom Entry', axes=axes)
 
 
+
+def figd_example_session_heatmap_split_by_block_v2(zscore, reward_df, DA_features_df, axes=None):
+    time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
+        zscore, reward_df,
+        cutoff_pre_reward=-0.5,
+        cutoff_post_reward=2,
+        bin_size_s=0.05,
+        category_by='block'  # Use 'block' to test the new logic
+    )
+    plot_heatmap_and_scatters(time_vec, cat_codes, cat_labels, heatmap_mat, DA_features_df,
+                              palette='Set2',
+                              split_cat=1,
+                              split_by_block=1,
+                              axes=axes)
 
 def figd_example_session_heatmap_split_by_block(zscore, reward_df, axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
@@ -1144,7 +1156,8 @@ def main():
     print(f'figc_example_session_heatmap_split_by_NRI took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=axes[7:11])
+    figd_example_session_heatmap_split_by_block_v2(zscore_heatmap, reward_df, DA_features_df, axes=axes[7:11])
+    # figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=axes[7:11])
     print(f'figd_example_session_heatmap_split_by_block took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
