@@ -56,7 +56,8 @@ def load_session_dataframe(animal_id, df_name, session_id=None, session_long_nam
     file_path = os.path.join(processed_dir, target_filename)
 
     print(f"Loading: {file_path}")  # Helpful for confirming the right file is being loaded
-
+    print(f"session: {target_filename[:-21]}")
+    session_long_name = target_filename[:-21]
     # 5. Load the file using the appropriate pandas function
     try:
         if file_format == 'parquet':

@@ -19,5 +19,18 @@ qc_selections = {
     },
     'SZ043': {
         'right'
+    },
+    'RK007': {
+        'left'
+    },
+    'RK008': {
+        'left'
+    },
+    'RK009': {
+        'left'
+    },
+    'RK010': {
+        'left',
+        'right'
     }
 }
