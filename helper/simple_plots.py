@@ -93,8 +93,8 @@ def data_reduction(df, lick_tol=.01, head_tol=.2):
     df = df[df.phase != 'setup']
     df = remove(df, 'head', head_tol, port=1)
     df = remove(df, 'head', head_tol, port=2)
-    # df = remove(df, 'lick', lick_tol, port=1)
-    # df = remove(df, 'lick', lick_tol, port=2)
+    df = remove(df, 'lick', lick_tol, port=1)
+    df = remove(df, 'lick', lick_tol, port=2)
     return df
 
 

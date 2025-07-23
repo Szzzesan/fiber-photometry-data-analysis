@@ -82,8 +82,8 @@ def get_valid_entry_exit(pi_events):
     # region valid trial condition 1: toss trials with multiple re-entry into the exponential port
     # but skip this step when it's a single-reward task
     if (pi_events['task'].iloc[0] != 'single_reward'):
-        is_single_entry = exp_entries.groupby('trial').entry_order_in_trial.max() == 1
-        single_entry_trials = is_single_entry[is_single_entry].index
+        is_minimal_reentry = exp_entries.groupby('trial').entry_order_in_trial.max() <= 2
+        single_entry_trials = is_minimal_reentry[is_minimal_reentry].index
         update_trial_validity(single_entry_trials)
         pi_events.is_valid_trial[~pi_events['trial'].isin(single_entry_trials)] = False
     # endregion

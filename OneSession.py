@@ -121,30 +121,38 @@ class OneSession:
         excess_bg_exits = [[] for _ in range(len(trials))]
         excess_exp_entries = [[] for _ in range(len(trials))]
         excess_exp_exits = [[] for _ in range(len(trials))]
+        is_valid_trial = [False] * len(trials)
         for i, trial_id in enumerate(trials):
             is_in_trial = self.pi_events['trial'] == trial_id
+            is_valid_trial[i] = self.pi_events.loc[is_in_trial, 'is_valid_trial'].to_list()[0]
             rewards[i] = self.pi_events.loc[reward & on & is_in_trial, 'time_recording'].to_list()
             licks[i] = self.pi_events.loc[lick & on & is_in_trial, 'time_recording'].to_list()
-            excess_bg_exits[i] = self.pi_events.loc[port2 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
-            excess_exp_entries[i] = self.pi_events.loc[port1 & head & on & is_in_trial & ~valid_head, 'time_recording'].to_list()
-            excess_exp_exits[i] = self.pi_events.loc[port1 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
-        self.trial_df = pd.DataFrame({'trial': trials, 'phase': phase, 'rewards': rewards, 'licks': licks,
-                                      'bg_entry': bg_entries, 'bg_exit': bg_exits,
-                                      'exp_entry': exp_entries, 'exp_exit': exp_exits,
-                                      'excess_bg_exits': excess_bg_exits,
-                                      'excess_exp_exits': excess_exp_exits,
-                                      'excess_exp_entries': excess_exp_entries
-                                      })
+            excess_bg_exits[i] = self.pi_events.loc[
+                port2 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
+            excess_exp_entries[i] = self.pi_events.loc[
+                port1 & head & on & is_in_trial & ~valid_head, 'time_recording'].to_list()
+            excess_exp_exits[i] = self.pi_events.loc[
+                port1 & head & off & is_in_trial & ~valid_head, 'time_recording'].to_list()
+        self.trial_df = pd.DataFrame(
+            {'trial': trials, 'phase': phase, 'is_valid_trial': is_valid_trial,
+             'rewards': rewards, 'licks': licks,
+             'bg_entry': bg_entries, 'bg_exit': bg_exits,
+             'exp_entry': exp_entries, 'exp_exit': exp_exits,
+             'excess_bg_exits': excess_bg_exits,
+             'excess_exp_exits': excess_exp_exits,
+             'excess_exp_entries': excess_exp_entries
+             })
 
     def construct_expreward_interval_df(self):
         [head, trial, cue, reward, lick, off, on, port1, port2, valid_head] = helper.get_bools(self.pi_events)
-        arr_reward_exp = self.pi_events.loc[port1 & reward & on, 'time_recording'].to_numpy()
-        arr_reward_bg = self.pi_events.loc[port2 & reward & on, 'time_recording'].to_numpy()
+        valid_trial = self.pi_events['is_valid_trial']
+        arr_reward_exp = self.pi_events.loc[port1 & reward & on & valid_trial, 'time_recording'].to_numpy()
+        arr_reward_bg = self.pi_events.loc[port2 & reward & on & valid_trial, 'time_recording'].to_numpy()
         arr_lastreward_exp = np.insert(arr_reward_exp[:-1], 0, np.nan)
         arr_nextreward_exp = np.append(arr_reward_exp[1:], np.nan)
-        arr_NRI = self.pi_events.loc[port1 & reward & on, 'time_in_port'].to_numpy()
-        arr_trial_exp = self.pi_events.loc[port1 & reward & on, 'trial']
-        arr_block_exp = self.pi_events.loc[port1 & reward & on, 'phase']
+        arr_NRI = self.pi_events.loc[port1 & reward & on & valid_trial, 'time_in_port'].to_numpy()
+        arr_trial_exp = self.pi_events.loc[port1 & reward & on & valid_trial, 'trial']
+        arr_block_exp = self.pi_events.loc[port1 & reward & on & valid_trial, 'phase']
         df_intervals = pd.DataFrame(
             {'trial': arr_trial_exp, 'block': arr_block_exp, 'last_reward_time': arr_lastreward_exp,
              'reward_time': arr_reward_exp, 'next_reward_time': arr_nextreward_exp, 'time_in_port': arr_NRI})
@@ -174,11 +182,14 @@ class OneSession:
         for i in range(df_intervals.shape[0]):
             search_begin = max(0, df_intervals.loc[i, 'reward_time'] - 30)
             search_end = df_intervals.loc[i, 'reward_time']
-            is_in_range = (self.pi_events['time_recording'] >= search_begin) & (self.pi_events['time_recording'] < search_end)
+            is_in_range = (self.pi_events['time_recording'] >= search_begin) & (
+                        self.pi_events['time_recording'] < search_end)
             onesec_begin = max(0, df_intervals.loc[i, 'reward_time'] - 1)
             onesec_end = df_intervals.loc[i, 'reward_time']
-            is_in_1sec = (self.pi_events['time_recording'] >= onesec_begin) & (self.pi_events['time_recording'] < onesec_end)
-            arr_recent_reward_rate[i] = self.pi_events.loc[is_in_range & reward & on].shape[0] / (search_end - search_begin)
+            is_in_1sec = (self.pi_events['time_recording'] >= onesec_begin) & (
+                        self.pi_events['time_recording'] < onesec_end)
+            arr_recent_reward_rate[i] = self.pi_events.loc[is_in_range & reward & on].shape[0] / (
+                        search_end - search_begin)
             arr_recent_reward_rate_exp[i] = self.pi_events.loc[is_in_range & reward & on & port1].shape[0] / (
                     search_end - search_begin)
             arr_local_reward_rate_1sec[i] = self.pi_events.loc[is_in_1sec & reward & on].shape[0]
@@ -797,11 +808,12 @@ class OneSession:
                                                           task=self.task)
 
     def extract_reward_features_and_DA(self, plot=0, save_dataframe=0):
-        df_iri_exp = helper.extract_intervals_expreward(
-            self.pi_events,
-            ani_str=self.animal,
-            ses_str=self.signal_dir[-21:-7]
-        )
+        # df_iri_exp = helper.extract_intervals_expreward(
+        #     self.pi_events,
+        #     ani_str=self.animal,
+        #     ses_str=self.signal_dir[-21:-7]
+        # )
+        df_iri_exp = self.expreward_df
         reward_times = df_iri_exp['reward_time'].to_numpy()
         peak_amps = {}
 
@@ -1460,12 +1472,14 @@ class OneSession:
                 self._save_data_object(self.trial_df, "trial_df", format, index=False)
             else:
                 self._save_data_object(self.trial_df, "trial_df", format)
+
     def save_expreward_df(self, format='parquet'):
         if self.expreward_df is not None:
             if format == 'csv':
                 self._save_data_object(self.expreward_df, "expreward_df", format, index=False)
             else:
                 self._save_data_object(self.expreward_df, "expreward_df", format)
+
     def save_DA_vs_features(self, format='parquet'):
         if self.DA_vs_NRI_IRI is not None:
             if format == 'csv':
@@ -1475,15 +1489,15 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ036', 12, include_branch='both', port_swap=0)
+    test_session = OneSession('RK007', 12, include_branch='left', port_swap=1)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
-    test_session.save_dFF0_and_zscore(format='parquet')
+    # test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
-    test_session.save_pi_events(format='parquet')
+    # test_session.save_pi_events(format='parquet')
     test_session.construct_trial_df()
-    test_session.save_trial_df(format='parquet')
+    # test_session.save_trial_df(format='parquet')
     test_session.construct_expreward_interval_df()
     test_session.save_expreward_df(format='parquet')
     # test_session.extract_bg_behav_by_trial()
@@ -1498,7 +1512,7 @@ if __name__ == '__main__':
     test_session.extract_reward_features_and_DA(plot=0, save_dataframe=0)
     df_intervals_exp = test_session.visualize_average_traces(variable='time_in_port', method='even_time',
                                                              block_split=False,
-                                                             plot_histograms=0, plot_linecharts=1)
+                                                             plot_histograms=0, plot_linecharts=0)
     test_session.visualize_DA_vs_NRI_IRI(plot_scatters=0, plot_histograms=0)
     test_session.save_DA_vs_features(format='csv')
     # DA_in_block_transition = test_session.bg_port_in_block_reversal(plot_single_traes=0, plot_average=0)
