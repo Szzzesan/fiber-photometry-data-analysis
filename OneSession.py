@@ -1286,11 +1286,12 @@ class OneSession:
         return DA_in_block_transition
 
     def visualize_DA_vs_NRI_IRI(self, plot_histograms=0, plot_scatters=0, save=0):
-        df_IRI_exp = helper.extract_intervals_expreward(self.pi_events, plot_histograms=plot_histograms,
-                                                        ani_str=self.animal,
-                                                        ses_str=self.signal_dir[-21:-7])
+        # df_IRI_exp = helper.extract_intervals_expreward(self.pi_events, plot_histograms=plot_histograms,
+        #                                                 ani_str=self.animal,
+        #                                                 ses_str=self.signal_dir[-21:-7])
+        df_IRI_exp = self.expreward_df
         df = df_IRI_exp
-        df = df[df['IRI_post'] > 0.5].reset_index(drop=True)
+        df = df[df['IRI_post'] > 0.6].reset_index(drop=True)
 
         arr_NRI = df['time_in_port'].to_numpy()
         arr_IRI = df['IRI_prior'].to_numpy()
