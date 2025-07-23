@@ -11,6 +11,7 @@ from collections import defaultdict
 from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 from scipy.stats import t
+from scipy import stats
 
 import time
 import seaborn as sns
@@ -881,6 +882,35 @@ def figg_DA_vs_IRI(master_df, axes=None):
         fig.show()
         return fig, axes
 
+# def _calculate_experienced_reward_prob(DA_features_df):
+
+
+def figf_DA_vs_reward_prob(master_df, axes=None):
+    data = master_df
+
+    for (animal, hemisphere), subset in data.groupby(['animal', 'hemisphere']):
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+        jitter_amount = 0.05
+        subset['jittered_NRI'] = subset['NRI'] + np.random.normal(0, jitter_amount, size=len(subset))
+        x = subset['jittered_NRI']
+        theoretical_prob = helper.exp_decreasing(x, cumulative=8., starting=1.)
+        subset['reward_prob'] = theoretical_prob
+
+        slope, intercept, r_value, p_value, std_err = stats.linregress(subset['reward_prob'], subset['DA'])
+
+        sns.regplot(data=subset, x='reward_prob', y='DA', ci=95, scatter_kws={'s': 5, 'alpha': 0.5})
+        ax.set_xlabel('Reward Probability')
+        ax.set_ylabel('Peak Amplitude')
+        ax.text(0.05, 0.9, f'p-value = {p_value:.4f}', transform=ax.transAxes, fontsize=12)
+        ax.text(0.05, 0.85, f'R-squared = {r_value ** 2:.3f}', transform=ax.transAxes, fontsize=12)
+        plt.title(f'{animal} {hemisphere}: DA vs. Reward Probability')
+        plt.show()
+
+        # if return_handle:
+        #     fig.show()
+        #     return fig, axes
+    print('hello')
+
 
 def setup_axes_v1():
     fig_size = (12, 10)  # (width, height) in inches
@@ -1214,6 +1244,17 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+    ## --- Plot DA amplitudes vs. reward probability ---
+    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # # animal_ids=["SZ036"]
+    # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                                        day_0='2023-11-30', file_format='parquet')
+    # animal_ids = ["RK007", "RK008"]
+    # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                                        day_0='2025-06-17', file_format='parquet')
+    # master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    # figf_DA_vs_reward_prob(master_DA_features_df, axes=None)
 
     ## --- Plot heatmaps from every single session ---
     # tuple_list = [('SZ036', 16), ('SZ037', 25), ('SZ038', 29), ('SZ039', 20), ('SZ042', 20), ('SZ043', 18),
