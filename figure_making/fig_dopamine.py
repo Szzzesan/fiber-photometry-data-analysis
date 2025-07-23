@@ -320,8 +320,8 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
     for i, label in enumerate(cat_labels_to_use):
         lower_bound = stats[label]['lower_bound']
         upper_bound = stats[label]['upper_bound']
-        ax_mean.plot(time_vector, stats[label]['mean'], label=label, color=palette_to_use[i])
-        ax_mean.fill_between(time_vector, lower_bound, upper_bound, color=palette_to_use[i], alpha=0.2,
+        ax_mean.plot(time_vector, stats[label]['mean'], label=label, color=palette_to_use[i], linewidth=0.75)
+        ax_mean.fill_between(time_vector, lower_bound, upper_bound, color=palette_to_use[i], alpha=0.4,
                              edgecolor='none')
     ax_mean.spines['top'].set_visible(False)
     ax_mean.spines['right'].set_visible(False)
@@ -331,10 +331,11 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
     ax_mean.xaxis.set_major_formatter(mticker.FormatStrFormatter('%g'))
     # ax_mean.set_ylim([-1.6, 3.7])
     ax_mean.set_ylabel('Mean DA (z-score)', labelpad=-6, y=0.55)
-    ax_mean.legend(title=legend_title,
+    leg = ax_mean.legend(title=legend_title,
                    prop={'weight': 'normal', 'size': 'small'},
                    title_fontproperties={'weight': 'normal', 'size': 'small'},
-                   handlelength=1, borderpad=0.4)
+                   handlelength=2, borderpad=0.4)
+    leg.get_title().set_ha('center')
 
     for ax in [ax_heatmap, ax_mean]:
         ax.set_xlabel('Time from Reward (s)')
@@ -522,7 +523,7 @@ def figc_example_session_heatmap_split_by_NRI(zscore, reward_df, axes=None):
         category_by='time_in_port'
     )
     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Reds_r', split_cat=0,
-                                 legend_title='Reward Time\nfrom Entry', axes=axes)
+                                 legend_title='Reward Time\nfrom Entry (s)', axes=axes)
 
 
 
@@ -549,7 +550,7 @@ def figd_example_session_heatmap_split_by_block(zscore, reward_df, axes=None):
         category_by='block'  # Use 'block' to test the new logic
     )
     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
-                                 legend_title='Block', axes=axes)
+                                 legend_title='Context\nReward Rate', axes=axes)
 
 
 def get_mean_sem_DA_for_feature(df, var='NRI', sample_per_bin=250):
@@ -662,7 +663,7 @@ def _set_axes_for_box_and_swarm(axes):
     axes.set_xticklabels(axes.get_xticklabels(), rotation=15, ha='right')
     # axes.set_title('DA vs. NRI', pad=-5)
     axes.set_xlabel('Reward Time from Entry (s)', labelpad=2)
-    axes.set_ylabel('Mean DA (z-score)')
+    axes.set_ylabel('Peak Amplitude')
     axes.spines['right'].set_visible(False)
     axes.spines['top'].set_visible(False)
     # axes.legend(title='Animal', bbox_to_anchor=(0.02, 1.3), loc='upper left')
@@ -700,8 +701,9 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
         patch.set_facecolor((r, g, b, 0.6))
 
     if dodge:  # then use the default color palette for categorical variable
+        animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK008']
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', size=1.5,
+                      hue='animal', hue_order=animal_order, size=1.5,
                       dodge=dodge, legend=False, ax=axes,
                       linewidth=0.5,
                       edgecolor='face')
@@ -827,7 +829,7 @@ def figg_DA_vs_IRI_v2(master_df, IRI_group_size=50, axes=None):
     axes.set_ylim([1.6, 4.1])
     # axes.set_title('DA vs. IRI Split by NRI Groups')
     axes.set_xlabel('Reward Time from Prior Reward (s)')
-    axes.set_ylabel('Mean DA (z-score)', y=0.2)
+    axes.set_ylabel('Peak Amplitude', y=0.3)
     axes.spines['top'].set_visible(False)
     axes.spines['right'].set_visible(False)
     axes.legend(title='Reward Time from Entry (s)',
