@@ -526,13 +526,13 @@ if __name__ == '__main__':
     # session_list = [0, 1, 2, 4, 11, 12, 13, 14, 15, 17, 18, 20, 22, 23, 24]
     # summary_RK6 = multi_session_analysis('RK006', session_list, include_branch='both', port_swap=1)
 
-    session_list = np.arange(0, 21)
-    summary_RK7 = multi_session_analysis('RK007', session_list, include_branch='both', port_swap=1)
+    session_list = np.arange(0, 20)
+    summary_RK7 = multi_session_analysis('RK007', session_list, include_branch='left', port_swap=1)
     session_list = np.arange(0, 25)
-    summary_RK8 = multi_session_analysis('RK008', session_list, include_branch='both', port_swap=0)
-    session_list = np.arange(0, 24)
-    summary_RK9 = multi_session_analysis('RK009', session_list, include_branch='both', port_swap=1)
-    session_list = np.arange(0, 23)
+    summary_RK8 = multi_session_analysis('RK008', session_list, include_branch='left', port_swap=0)
+    session_list = np.arange(0, 15)
+    summary_RK9 = multi_session_analysis('RK009', session_list, include_branch='left', port_swap=1)
+    session_list = np.arange(0, 13)
     summary_RK10 = multi_session_analysis('RK010', session_list, include_branch='both', port_swap=0)
 
     session_list = [1, 2, 3, 5, 7, 9, 11, 12, 14, 15, 19, 22, 23, 24, 25]
