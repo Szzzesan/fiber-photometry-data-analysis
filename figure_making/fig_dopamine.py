@@ -12,6 +12,8 @@ from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 from scipy.stats import t
 from scipy import stats
+# from statannot import add_stat_annotation
+from statannotations.Annotator import Annotator
 
 import time
 import seaborn as sns
@@ -654,11 +656,57 @@ def _prepare_binned_data(master_df, group_by_cols):
     bin_labels[-1] = f'>{bins[-2]}'
     data['cat_code'] = pd.cut(data['NRI'], bins=bins, labels=bin_labels)
     summary_data = data.groupby(group_by_cols, observed=True).agg(
-        NRI=('NRI', 'mean'),
+        NRI=('NRI', 'median'),
         DA=('DA', 'mean')
     ).reset_index()
     return summary_data
 
+def _paired_t_for_NRI_bins(summary_data):
+    cat_code = summary_data['cat_code'].unique()
+    grouped = summary_data.groupby(['animal', 'session'])
+    compared = []
+    paired_t_stats = []
+    paired_p_values = []
+    for i in range(len(cat_code)-1):
+        cat1 = cat_code[i]
+        cat2 = cat_code[i+1]
+        DA_early = []
+        DA_late = []
+        for (animal, session), group in grouped:
+            DA1 = group.loc[group['cat_code']==cat1, 'DA'].values
+            DA2 = group.loc[group['cat_code']==cat2, 'DA'].values
+            if (len(DA1) == 1) & (len(DA2) == 1):
+                DA_early.append(DA1[0])
+                DA_late.append(DA2[0])
+        t_stat, p_value = stats.ttest_rel(DA_early, DA_late)
+        compared.append((cat1, cat2))
+        paired_t_stats.append(t_stat)
+        paired_p_values.append(p_value)
+        print(f't_stat = {t_stat:.3f}, p_value = {p_value:.4f}')
+    return compared, paired_t_stats, paired_p_values
+
+def _paired_t_for_blocks(summary_data):
+    grouped = summary_data.groupby(['session'])
+    cat_code = summary_data['cat_code'].unique().tolist()
+    compared = []
+    paired_t_stats = []
+    paired_p_values = []
+
+    for cat in cat_code:
+        DA_low = []
+        DA_high = []
+        for session, group in grouped:
+            DA1 = group.loc[(group['block'] == '0.4') & (group['cat_code'] == cat), 'DA'].values
+            DA2 = group.loc[(group['block'] == '0.8') & (group['cat_code'] == cat), 'DA'].values
+            if (len(DA1) == 1) & (len(DA2) == 1):
+                DA_low.append(DA1[0])
+                DA_high.append(DA2[0])
+        t_stat, p_value = stats.ttest_rel(DA_low, DA_high)
+        compared.append(cat)
+        paired_t_stats.append(t_stat)
+        paired_p_values.append(p_value)
+        print(f't_stat = {t_stat:.3f}, p_value = {p_value:.4f}')
+    return compared, paired_t_stats, paired_p_values
 
 def _set_axes_for_box_and_swarm(axes):
     axes.set_xticklabels(axes.get_xticklabels(), rotation=15, ha='right')
@@ -696,13 +744,37 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
                 boxprops=dict(facecolor='lightgrey', alpha=0.4),
                 medianprops={'linewidth': 2, 'color': 'black'},
                 ax=axes)
+    # add the stats annotation over the boxplots
+    group_compared, t_stats, p_values = _paired_t_for_NRI_bins(session_summary_data)
+    y_bars = [4.2, 4.6, 4.8, 5.0, 5.5, 5.5, 6.2]
+    for center in range(len(p_values)):
+        if p_values[center] < 0.0001:
+            annot = "****"
+        elif p_values[center] < 0.001:
+            annot = "***"
+        elif p_values[center] < 0.01:
+            annot = "**"
+        elif p_values[center] < 0.05:
+            annot = "*"
+        else:
+            annot = 'ns'
+        x_center1, x_center2 = center, center+1
+        inset = 0.05
+        bracket_x1 = x_center1 + inset
+        bracket_x2 = x_center2 - inset
+        y, h = y_bars[center], 0.1
+        col = 'k'
+        axes.plot([bracket_x1, bracket_x1, bracket_x2, bracket_x2],
+                [y, y + h, y + h, y], lw=1, c=col)
+        axes.text((bracket_x1 + bracket_x2) * 0.5, y + h/2, annot,
+                ha='center', va='bottom', color=col, fontsize=10)
 
     for patch in axes.patches:
         r, g, b, a = patch.get_facecolor()
         patch.set_facecolor((r, g, b, 0.6))
 
     if dodge:  # then use the default color palette for categorical variable
-        animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK008']
+        animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK009', 'RK010']
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
                       hue='animal', hue_order=animal_order, size=1.5,
                       dodge=dodge, legend=False, ax=axes,
@@ -759,6 +831,7 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
                 medianprops={'linewidth': 1, 'color': 'black'},
                 legend=False,
                 showfliers=False, ax=axes)
+    group_compared, t_stats, p_values = _paired_t_for_blocks(session_summary_data)
 
     std = session_summary_data.groupby(['cat_code', 'block'])['DA'].transform('std')
     mean = session_summary_data.groupby(['cat_code'])['DA'].transform('mean')
@@ -1177,7 +1250,7 @@ def main():
     master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
                                                                            day_0='2023-11-30', file_format='parquet')
 
-    animal_ids = ["RK007", "RK008"]
+    animal_ids = ["RK007", "RK009"]
     master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
                                                                            day_0='2025-06-17', file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
