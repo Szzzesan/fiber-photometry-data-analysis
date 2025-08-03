@@ -477,8 +477,8 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
             # ani_summary.session_obj_list[i].extract_transient(plot_zscore=0)
             # ani_summary.session_obj_list[i].visualize_correlation_scatter(save=0)
             # ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=0)
-            ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
-            ani_summary.session_obj_list[i].save_DA_vs_features(format='parquet')
+            # ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
+            # ani_summary.session_obj_list[i].save_DA_vs_features(format='parquet')
             # ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
             #                                                          block_split=False,
             #                                                          plot_linecharts=0,

@@ -99,7 +99,7 @@ class OneSession:
 
     def process_behavior_data(self, save=0):
         self.pi_events["time_recording"] = (self.pi_events['time'] - self.neural_events.timestamps[0]) / 1000
-        self.pi_events = helper.data_reduction(self.pi_events, lick_tol=.01, head_tol=0.2)
+        self.pi_events = helper.data_reduction(self.pi_events, lick_tol=.015, head_tol=0.2)
         self.pi_events = helper.add_2ndry_properties_to_pi_events(self.pi_events)
         # self.pi_events.reset_index(drop=True, inplace=True)
         self.idx_taskbegin = self.dFF0.index[
@@ -1490,7 +1490,7 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('RK007', 12, include_branch='left', port_swap=1)
+    test_session = OneSession('SZ036', 15, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
     test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.save_dFF0_and_zscore(format='parquet')
@@ -1498,7 +1498,7 @@ if __name__ == '__main__':
     test_session.process_behavior_data(save=0)
     # test_session.save_pi_events(format='parquet')
     test_session.construct_trial_df()
-    # test_session.save_trial_df(format='parquet')
+    test_session.save_trial_df(format='parquet')
     test_session.construct_expreward_interval_df()
     test_session.save_expreward_df(format='parquet')
     # test_session.extract_bg_behav_by_trial()

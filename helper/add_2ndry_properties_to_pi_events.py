@@ -80,18 +80,18 @@ def get_valid_entry_exit(pi_events):
     update_trial_validity(complete_trials)
     # endregion
     # region valid trial condition 1: toss trials with multiple re-entry into the exponential port
-    # but skip this step when it's a single-reward task
-    if (pi_events['task'].iloc[0] != 'single_reward'):
-        is_minimal_reentry = exp_entries.groupby('trial').entry_order_in_trial.max() <= 2
-        single_entry_trials = is_minimal_reentry[is_minimal_reentry].index
-        update_trial_validity(single_entry_trials)
-        pi_events.is_valid_trial[~pi_events['trial'].isin(single_entry_trials)] = False
+    # # but skip this step when it's a single-reward task
+    # if (pi_events['task'].iloc[0] != 'single_reward'):
+    #     is_minimal_reentry = exp_entries.groupby('trial').entry_order_in_trial.max() <= 2
+    #     single_entry_trials = is_minimal_reentry[is_minimal_reentry].index
+    #     update_trial_validity(single_entry_trials)
+    #     pi_events.is_valid_trial[~pi_events['trial'].isin(single_entry_trials)] = False
     # endregion
     # region valid trial condition 2: toss trials with background stay too long
     bg_stay = bg_exits.groupby('trial').trial_time.max()
     trial_phase = bg_exits.groupby('trial').phase.max()
-    good_for_long_block = (trial_phase == '0.4') & (bg_stay < 15)
-    good_for_short_block = (trial_phase == '0.8') & (bg_stay < 7.5)
+    good_for_long_block = (trial_phase == '0.4') & (bg_stay < 25)
+    good_for_short_block = (trial_phase == '0.8') & (bg_stay < 12.5)
     good_bg_stay = good_for_long_block | good_for_short_block
     good_bg_trials = good_bg_stay[good_bg_stay].index
     update_trial_validity(good_bg_trials)
