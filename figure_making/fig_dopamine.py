@@ -23,7 +23,7 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
 import matplotlib.ticker as mticker
-import cmasher
+# import cmasher
 
 mpl.rcParams['figure.dpi'] = 300
 
@@ -235,7 +235,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
 
     # --- 2. Prepare axes/grids ---
     if axes is None:
-        fig = plt.figure(figsize=(6, 3))
+        fig = plt.figure(figsize=(8, 4))
         gs_outer = GridSpec(1, 2, width_ratios=[21.5, 20], wspace=0.3)
         gs_inner = GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_outer[0], width_ratios=[0.5, 20, 1], wspace=0.05)
         ax_bars = fig.add_subplot(gs_inner[0, 0])
@@ -309,6 +309,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
         len(time_vector) - 1  # End position
     ]
 
+    ax_heatmap.axvline(x=xtick_positions[xtick_labels.index(0)], color='white', linestyle='--')
     ax_heatmap.set_xticks(xtick_positions)
     ax_heatmap.set_xticklabels(xtick_labels, rotation=0)
     ax_heatmap.set_ylabel(None)
@@ -326,6 +327,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
         ax_mean.plot(time_vector, stats[label]['mean'], label=label, color=palette_to_use[i], linewidth=0.75)
         ax_mean.fill_between(time_vector, lower_bound, upper_bound, color=palette_to_use[i], alpha=0.4,
                              edgecolor='none')
+    ax_mean.axvline(x=0, color='blue', linestyle='--')
     ax_mean.spines['top'].set_visible(False)
     ax_mean.spines['right'].set_visible(False)
     # ax_mean.set_xticks(xtick_positions)
@@ -398,6 +400,7 @@ def plot_DA_vs_NRI_scatters_with_average_curve(master_df, split_block=0, axes=No
     ax.spines['right'].set_visible(False)
 
     if return_handle:
+        fig.tight_layout()
         fig.show()
         return fig, axes
 
@@ -1316,7 +1319,26 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    ## --- Plot example trial 1d ---
+    # animal_str = 'SZ036'
+    # session_name = '2024-01-08T13_52'
+    # zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
+    #                                                           session_long_name=session_name,
+    #                                                           file_format='parquet')
+    # trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
+    #                                               file_format='parquet')
+    # figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=None)
+
+    ## --- Plot example sessions heatmap and average traces ---
+    animal_str = 'SZ036'
+    session_name = '2023-12-30T19_57'
+    zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
+                                                        file_format='parquet')
+    reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
+                                                   file_format='parquet')
+    figc_example_session_heatmap_split_by_NRI(zscore_heatmap, reward_df, axes=None)
+    figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=None)
 
     ## --- Plot DA amplitudes vs. reward probability ---
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
