@@ -1012,7 +1012,7 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     df['logNRI'] = np.log(df['NRI'])
     df['logIRI'] = np.log(df['IRI'])
     model = smf.mixedlm(
-        "DA ~ logNRI + logIRI + block + day_relative + session_of_day",
+        "DA ~ logNRI + logIRI + C(block, Treatment(reference='0.8')) + day_relative + session_of_day",
         data=df,
         groups=df["animal_hemisphere"]
     )
@@ -1028,8 +1028,10 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     # 'Group' is the variance of the random intercepts, not a fixed effect.
     # The 'Intercept' is often excluded from coefficient plots for clarity.
     conf_to_plot = conf.drop(index=['Group Var', 'Intercept'])
-    desired_order = ['logNRI', 'logIRI', 'block[T.0.8]', 'day_relative', 'session_of_day']
+    desired_order = ['logNRI', 'C(block, Treatment(reference='0.8'))[T.0.4]', 'logIRI', 'day_relative', 'session_of_day']
     conf_to_plot = conf_to_plot.reindex(desired_order)
+    name_map = {'log(NRI)', 'block[T.low]', 'log(IRI)', 'day_relative', 'session_of_day'}
+    conf_to_plot = conf_to_plot.rename(index=name_map)
 
     # Plot the confidence intervals
     errors = conf_to_plot['upper'] - conf_to_plot['estimate']
