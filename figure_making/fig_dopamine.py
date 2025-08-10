@@ -12,8 +12,7 @@ from scipy.stats import gaussian_kde
 from scipy.optimize import curve_fit
 from scipy.stats import t
 from scipy import stats
-# from statannot import add_stat_annotation
-from statannotations.Annotator import Annotator
+import statsmodels.formula.api as smf
 
 import time
 import seaborn as sns
@@ -585,7 +584,7 @@ def get_mean_sem_DA_for_feature(df, var='NRI', sample_per_bin=250):
 def figef_DA_vs_NRI(master_df, axes=None):
     data = master_df[(master_df['IRI'] > 1)]
     if axes is None:
-        fig, axes = plt.subplots(1, 2, figsize=(20, 6))
+        fig, axes = plt.subplots(2, 1, figsize=(15, 12))
         return_handle = True
     else:
         fig = None
@@ -594,27 +593,30 @@ def figef_DA_vs_NRI(master_df, axes=None):
     for animal in data['animal'].unique():
         subset = data[data['animal'] == animal].copy()
         # # if plot scatter
-        xy = np.vstack([subset['NRI'], subset['DA']])
-        z = gaussian_kde(xy)(xy)
-        subset['density'] = z
-        sample_data = subset.sample(n=500, random_state=101).copy()  # if by fraction, use frac=0.05
-        sample_data.sort_values('density', inplace=True)
-        jitter_amount = 0.05
-        sample_data['jittered_NRI'] = sample_data['NRI'] + np.random.normal(0, jitter_amount, size=len(sample_data))
-        sns.scatterplot(data=sample_data, x='jittered_NRI', y='DA', hue='density', legend=False, alpha=0.5, s=5,
-                        edgecolor='none', ax=ax)
-        # df_plot = get_mean_sem_DA_for_feature(subset, var='NRI', sample_per_bin=300)
-        # x = df_plot['bin_center']
-        # y = df_plot['mean']
-        # y_err = df_plot['sem']
-        # line = ax.plot(x, y, linewidth=1.5, alpha=0.8, label=animal)
-        # ax.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.5)
+        # xy = np.vstack([subset['NRI'], subset['DA']])
+        # z = gaussian_kde(xy)(xy)
+        # subset['density'] = z
+        # sample_data = subset.sample(n=500, random_state=101).copy()  # if by fraction, use frac=0.05
+        # sample_data.sort_values('density', inplace=True)
+        # jitter_amount = 0.05
+        # sample_data['jittered_NRI'] = sample_data['NRI'] + np.random.normal(0, jitter_amount, size=len(sample_data))
+        # sns.scatterplot(data=sample_data, x='jittered_NRI', y='DA', hue='density', legend=False, alpha=0.5, s=5,
+        #                 edgecolor='none', ax=ax)
+        ## if plot mean and sem curves
+        df_plot = get_mean_sem_DA_for_feature(subset, var='NRI', sample_per_bin=150)
+        x = df_plot['bin_center']
+        y = df_plot['mean']
+        y_err = df_plot['sem']
+        line = ax.plot(x, y, linewidth=1.5, alpha=0.8, label=animal)
+        ax.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.5)
 
         # if plot fitted logarithmic function
-        x_fit, y_fit, upper, lower = fit_to_logarithmic(subset, 'NRI', 'DA')
-        line = ax.plot(x_fit, y_fit, linewidth=1.5, label=f'{animal}')
-        ax.fill_between(x_fit, lower, upper, color=line[0].get_color(), alpha=0.3)
+        # x_fit, y_fit, upper, lower = fit_to_logarithmic(subset, 'NRI', 'DA')
+        # line = ax.plot(x_fit, y_fit, linewidth=1.5, label=f'{animal}')
+        # ax.fill_between(x_fit, lower, upper, color=line[0].get_color(), alpha=0.3)
         ax.legend(title='Animal', fontsize='x-small')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
     ax = axes[1]
     for block in data['block'].unique():
@@ -625,27 +627,41 @@ def figef_DA_vs_NRI(master_df, axes=None):
             color = sns.color_palette('Set2')[1]
             label = 'high'
         subset = data[data['block'] == block].copy()
-        xy = np.vstack([subset['NRI'], subset['DA']])
-        z = gaussian_kde(xy)(xy)
-        subset['density'] = z
-        sample_data = subset.sample(n=1000, random_state=1001).copy()  # if by fraction, use frac=0.05
-        sample_data.sort_values('density', inplace=True)
-        jitter_amount = 0.05
-        sample_data['jittered_NRI'] = sample_data['NRI'] + np.random.normal(0, jitter_amount, size=len(sample_data))
-        sns.scatterplot(data=sample_data, x='jittered_NRI', y='DA', hue='density',
-                        palette=sns.light_palette(color, as_cmap=True),
-                        legend=False, alpha=0.7, s=5, edgecolor='none', ax=ax)
-        x_fit, y_fit, upper, lower = fit_to_logarithmic(subset, 'NRI', 'DA')
-        ax.plot(x_fit, y_fit, c=color, linewidth=1.5, label=label)
-        ax.fill_between(x_fit, lower, upper, color=color, alpha=0.3)
+        ## if plot sample datapoints
+        # xy = np.vstack([subset['NRI'], subset['DA']])
+        # z = gaussian_kde(xy)(xy)
+        # subset['density'] = z
+        # sample_data = subset.sample(n=1000, random_state=1001).copy()  # if by fraction, use frac=0.05
+        # sample_data.sort_values('density', inplace=True)
+        # jitter_amount = 0.05
+        # sample_data['jittered_NRI'] = sample_data['NRI'] + np.random.normal(0, jitter_amount, size=len(sample_data))
+        # sns.scatterplot(data=sample_data, x='jittered_NRI', y='DA', hue='density',
+        #                 palette=sns.light_palette(color, as_cmap=True),
+        #                 legend=False, alpha=0.7, s=5, edgecolor='none', ax=ax)
+
+        ## if plot mean and sem curves
+        df_plot = get_mean_sem_DA_for_feature(subset, var='NRI', sample_per_bin=500)
+        x = df_plot['bin_center']
+        y = df_plot['mean']
+        y_err = df_plot['sem']
+        line = ax.plot(x, y, linewidth=1.5, alpha=0.8, color=color, label=label)
+        ax.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.5)
+
+        ## if plot fitted curves
+        # x_fit, y_fit, upper, lower = fit_to_logarithmic(subset, 'NRI', 'DA')
+        # ax.plot(x_fit, y_fit, c=color, linewidth=1.5, label=label)
+        # ax.fill_between(x_fit, lower, upper, color=color, alpha=0.3)
         ax.legend(title='Context\nReward Rate', fontsize='small')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
     for ax in axes.flat:
         ax.set_xlim([-0.1, 11])
-        ax.set_ylim([0, 4.5])
+        ax.set_yticks([2, 2.5, 3, 3.5, 4, 4.5])
+        # ax.set_ylim([0, 4.5])
         ax.set_xlabel('Reward Time from Entry (s)')
-        ax.set_ylabel('DA amplitude')
-        ax.set_title('DA vs. NRI')
+        ax.set_ylabel('Peak Amplitude')
+        # ax.set_title('DA vs. NRI')
 
     if return_handle:
         fig.show()
@@ -778,7 +794,7 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
         patch.set_facecolor((r, g, b, 0.6))
 
     if dodge:  # then use the default color palette for categorical variable
-        animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK008', 'RK009']
+        animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK008']
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
                       hue='animal', hue_order=animal_order, size=3,
                       dodge=dodge, legend=False, ax=axes,
@@ -835,7 +851,30 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
                 medianprops={'linewidth': 1, 'color': 'black'},
                 legend=False,
                 showfliers=False, ax=axes)
+    # add stats annotation
     group_compared, t_stats, p_values = _paired_t_for_blocks(session_summary_data)
+    y_bars = [4.2, 4.6, 4.8, 5.0, 5.5, 5.5, 6.2, 6.25]
+    for center in range(len(p_values)):
+        if p_values[center] < 0.0001:
+            annot = "****"
+        elif p_values[center] < 0.001:
+            annot = "***"
+        elif p_values[center] < 0.01:
+            annot = "**"
+        elif p_values[center] < 0.05:
+            annot = "*"
+        else:
+            annot = 'ns'
+        x_center1, x_center2 = center-0.2, center+0.2
+        inset = 0.05
+        bracket_x1 = x_center1 + inset
+        bracket_x2 = x_center2 - inset
+        y, h = y_bars[center], 0.1
+        col = 'k'
+        axes.plot([bracket_x1, bracket_x1, bracket_x2, bracket_x2],
+                [y, y + h, y + h, y], lw=1, c=col)
+        axes.text((bracket_x1 + bracket_x2) * 0.5, y + h/2, annot,
+                ha='center', va='bottom', color=col, fontsize=10)
 
     std = session_summary_data.groupby(['cat_code', 'block'])['DA'].transform('std')
     mean = session_summary_data.groupby(['cat_code'])['DA'].transform('mean')
@@ -879,10 +918,10 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
 
 
 def figg_DA_vs_IRI_v2(master_df, IRI_group_size=50, axes=None):
-    data = master_df[master_df['NRI'] >= master_df['IRI']]
+    data = master_df[(master_df['NRI'] >= master_df['IRI']) & (master_df['IRI'] > 1)]
     # data = master_df
     if axes is None:
-        fig, axes = plt.subplots(1, 1, figsize=(5, 4))
+        fig, axes = plt.subplots(1, 1, figsize=(8, 4))
         return_handle = True
     else:
         fig = None
@@ -894,17 +933,19 @@ def figg_DA_vs_IRI_v2(master_df, IRI_group_size=50, axes=None):
     bin_labels[-1] = f'>{bins[-2]}'
     data['cat_code'] = pd.cut(data['NRI'], bins=bins, labels=bin_labels)
     data_plot = defaultdict(pd.DataFrame)
+    cat_num = len(bin_labels)
+    palette_to_use = list(sns.color_palette('Reds_r', n_colors=cat_num + 1))[:cat_num]
     for cat in bin_labels:
         subset = data[data['cat_code'] == cat]
         mean_sem = get_mean_sem_DA_for_feature(subset, var='IRI', sample_per_bin=IRI_group_size)
         data_plot[cat] = mean_sem
-    for cat in bin_labels:
+    for i, cat in enumerate(bin_labels):
         x = data_plot[cat]['bin_center']
         y = data_plot[cat]['mean']
         y_err = data_plot[cat]['sem']
-        line = axes.plot(x, y, linewidth=0.5, label=cat)
+        line = axes.plot(x, y, linewidth=0.5, label=cat, color=palette_to_use[i])
         axes.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.4, edgecolor='none')
-    axes.set_ylim([1.6, 4.1])
+    # axes.set_ylim([1.6, 4.1])
     # axes.set_title('DA vs. IRI Split by NRI Groups')
     axes.set_xlabel('Reward Time from Prior Reward (s)')
     axes.set_ylabel('Peak Amplitude', y=0.3)
@@ -958,6 +999,62 @@ def figg_DA_vs_IRI(master_df, axes=None):
     if return_handle:
         fig.show()
         return fig, axes
+
+def figg_LMEM_coefficients_v3(master_df, axes=None):
+    df = master_df[(master_df['IRI'] > 1)]
+    if axes is None:
+        fig, axes = plt.subplots(1, 1, figsize=(8, 4))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+    df['animal_hemisphere'] = df['animal'].astype(str) + '_' + df['hemisphere'].astype(str)
+    df['logNRI'] = np.log(df['NRI'])
+    df['logIRI'] = np.log(df['IRI'])
+    model = smf.mixedlm(
+        "DA ~ logNRI + logIRI + block + day_relative + session_of_day",
+        data=df,
+        groups=df["animal_hemisphere"]
+    )
+    model_results = model.fit()
+    print(model_results.summary())
+
+    # plot the coeffient whisker plot
+    params = model_results.params
+    conf = model_results.conf_int()
+    conf['estimate'] = params
+    conf.columns = ['lower', 'upper', 'estimate']
+
+    # 'Group' is the variance of the random intercepts, not a fixed effect.
+    # The 'Intercept' is often excluded from coefficient plots for clarity.
+    conf_to_plot = conf.drop(index=['Group Var', 'Intercept'])
+    desired_order = ['logNRI', 'logIRI', 'block[T.0.8]', 'day_relative', 'session_of_day']
+    conf_to_plot = conf_to_plot.reindex(desired_order)
+
+    # Plot the confidence intervals
+    errors = conf_to_plot['upper'] - conf_to_plot['estimate']
+    axes.errorbar(
+        y=conf_to_plot['estimate'],
+        x=conf_to_plot.index,
+        yerr=errors,
+        fmt='o',  # 'o' for a dot, could be 's' for square, etc.
+        color='black',
+        capsize=5,
+        linestyle='None',  # No line connecting the dots
+        markersize=8
+    )
+
+    axes.axhline(y=0, color='grey', linestyle='--')
+
+    axes.set_title('Coefficient Plot with 95% Confidence Intervals', fontsize=16)
+    axes.set_ylabel('Coefficient Estimate', fontsize=12)
+    axes.set_xlabel('Predictor Variable', fontsize=12)
+
+    if return_handle:
+        plt.tight_layout()
+        fig.show()
+        return fig, axes
+    print('hello')
 
 # def _calculate_experienced_reward_prob(DA_features_df):
 
@@ -1254,7 +1351,7 @@ def main():
     master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
                                                                            day_0='2023-11-30', file_format='parquet')
 
-    animal_ids = ["RK007", "RK009"]
+    animal_ids = ["RK007", "RK008"]
     master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
                                                                            day_0='2025-06-17', file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
@@ -1346,13 +1443,15 @@ if __name__ == '__main__':
     master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
                                                                            day_0='2023-11-30', file_format='parquet')
 
-    animal_ids = ["RK007", "RK008", "RK009"]
+    animal_ids = ["RK007", "RK008"]
     master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
                                                                            day_0='2025-06-17', file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
+    # figef_DA_vs_NRI(master_DA_features_df)
     # fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
-    figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=None)
-
+    # figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=None)
+    # figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=450, axes=None)
     ## --- Plot DA amplitudes vs. reward probability ---
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # # animal_ids=["SZ036"]
