@@ -2,6 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 
+
+
+
+
 # Simulated nonlinear signal
 t = np.linspace(0, 2, 1000)  # Time
 signal = np.sin(2 * np.pi * t) + 0.2 * np.random.randn(1000)  # Example signal with noise
