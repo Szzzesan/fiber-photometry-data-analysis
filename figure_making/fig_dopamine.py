@@ -655,6 +655,7 @@ def figef_DA_vs_NRI(master_df, axes=None):
 def _prepare_binned_data(master_df, group_by_cols):
     data = master_df[master_df['IRI'] > 1].copy()
     bins = [0, 0.8, 1.8, 2.9, 4.1, 5.5, 7.3, 9.6, np.inf]
+    # bins = [0, 0.6, 1.3, 2.1, 2.9, 3.9, 5.0, 6.2, 7.6, 9.4, np.inf]
     bin_labels = [f'{bins[i]}-{bins[i + 1]}' for i in range(len(bins) - 1)]
     bin_labels[-1] = f'>{bins[-2]}'
     data['cat_code'] = pd.cut(data['NRI'], bins=bins, labels=bin_labels)
@@ -777,9 +778,9 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
         patch.set_facecolor((r, g, b, 0.6))
 
     if dodge:  # then use the default color palette for categorical variable
-        animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK009', 'RK010']
+        animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK008', 'RK009']
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', hue_order=animal_order, size=1.5,
+                      hue='animal', hue_order=animal_order, size=3,
                       dodge=dodge, legend=False, ax=axes,
                       linewidth=0.5,
                       edgecolor='face')
@@ -844,7 +845,7 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
         (session_summary_data['DA'] > lower_bound) & (session_summary_data['DA'] < upper_bound)]
     # custom_palette = {'0.4': sns.color_palette('colorblind')[0], '0.8': sns.color_palette('colorblind')[3]}
     sns.swarmplot(data=swarm_data, x='cat_code', y='DA', hue='block',
-                  size=1, palette=custom_palette,
+                  size=2.5, palette=custom_palette,
                   dodge=True, legend=False, ax=axes,
                   linewidth=0.5,
                   edgecolor='face')
@@ -1331,14 +1332,26 @@ if __name__ == '__main__':
     # figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=None)
 
     ## --- Plot example sessions heatmap and average traces ---
-    animal_str = 'SZ036'
-    session_name = '2023-12-30T19_57'
-    zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
-                                                        file_format='parquet')
-    reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
-                                                   file_format='parquet')
-    figc_example_session_heatmap_split_by_NRI(zscore_heatmap, reward_df, axes=None)
-    figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=None)
+    # animal_str = 'SZ036'
+    # session_name = '2023-12-30T19_57'
+    # zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
+    #                                                     file_format='parquet')
+    # reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
+    #                                                file_format='parquet')
+    # figc_example_session_heatmap_split_by_NRI(zscore_heatmap, reward_df, axes=None)
+    # figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=None)
+
+    ## --- Plot DA vs. NRI for all data ---
+    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+                                                                           day_0='2023-11-30', file_format='parquet')
+
+    animal_ids = ["RK007", "RK008", "RK009"]
+    master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+                                                                           day_0='2025-06-17', file_format='parquet')
+    master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    # fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
+    figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=None)
 
     ## --- Plot DA amplitudes vs. reward probability ---
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
