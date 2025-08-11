@@ -71,9 +71,9 @@ def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     ax.axvspan(exp_entry, exp_exit, ymin=0.89, ymax=1, facecolor='lightcoral', alpha=0.6, edgecolor='none',
                label='Investment Port')
     draw_vertical_lines(ax, licks, ymin=0.9, ymax=1, color='grey', alpha=0.1)
-    draw_vertical_lines(ax, entries, color='b', linestyle='--')
-    draw_vertical_lines(ax, exits, color='g', linestyle='--')
-    draw_vertical_lines(ax, rewards, color='r')
+    draw_vertical_lines(ax, entries, color='g', linestyle='--')
+    draw_vertical_lines(ax, exits, color='r', linestyle='--')
+    draw_vertical_lines(ax, rewards, color='b')
     ax.plot(relative_time, DA_trace_to_plot, color='black')
     ax.set_xlim([-1, 15])
     ax.set_xticks(np.arange(0, 15.5, 2.5))
@@ -97,9 +97,9 @@ def figa_example_trial_legend(ax=None):
     from matplotlib import lines
 
     lines_for_legend = [
-        lines.Line2D([0, 0], [0, 10], color='b', linestyle=(0, (3, 1.5)), label='Entry'),
-        lines.Line2D([0, 0], [0, 10], color='r', linestyle='solid', label='Reward'),
-        lines.Line2D([0, 0], [0, 10], color='g', linestyle=(0, (3, 1.5)), label='Exit'),
+        lines.Line2D([0, 0], [0, 10], color='g', linestyle=(0, (3, 1.5)), label='Entry'),
+        lines.Line2D([0, 0], [0, 10], color='b', linestyle='solid', label='Reward'),
+        lines.Line2D([0, 0], [0, 10], color='r', linestyle=(0, (3, 1.5)), label='Exit'),
         lines.Line2D([0, 0], [0, 10], color='grey', linestyle='solid', label='Lick Times'),
         # lines.Line2D([0, 1], [0, 0], color='k', linestyle='solid', label='DA (z-score)'),
     ]
@@ -607,14 +607,14 @@ def figef_DA_vs_NRI(master_df, axes=None):
         x = df_plot['bin_center']
         y = df_plot['mean']
         y_err = df_plot['sem']
-        line = ax.plot(x, y, linewidth=1.5, alpha=0.8, label=animal)
+        line = ax.plot(x, y, linewidth=1.5, alpha=0.8)
         ax.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.5)
 
         # if plot fitted logarithmic function
         # x_fit, y_fit, upper, lower = fit_to_logarithmic(subset, 'NRI', 'DA')
         # line = ax.plot(x_fit, y_fit, linewidth=1.5, label=f'{animal}')
         # ax.fill_between(x_fit, lower, upper, color=line[0].get_color(), alpha=0.3)
-        ax.legend(title='Animal', fontsize='x-small')
+        # ax.legend(title='Animal', fontsize='x-small')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
@@ -796,7 +796,7 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
     if dodge:  # then use the default color palette for categorical variable
         animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK008']
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', hue_order=animal_order, size=3,
+                      hue='animal', hue_order=animal_order, size=1,
                       dodge=dodge, legend=False, ax=axes,
                       linewidth=0.5,
                       edgecolor='face')
@@ -804,7 +804,7 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
         animal_order = session_summary_data.groupby('animal')['DA'].mean().sort_values(ascending=False).index
         custom_palette = sns.color_palette("RdYlBu", n_colors=len(animal_order))
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', size=2,
+                      hue='animal', size=1,
                       dodge=dodge, hue_order=animal_order, palette='cmr.guppy',
                       legend=False, ax=axes,
                       linewidth=0.75,
@@ -884,7 +884,7 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
         (session_summary_data['DA'] > lower_bound) & (session_summary_data['DA'] < upper_bound)]
     # custom_palette = {'0.4': sns.color_palette('colorblind')[0], '0.8': sns.color_palette('colorblind')[3]}
     sns.swarmplot(data=swarm_data, x='cat_code', y='DA', hue='block',
-                  size=2.5, palette=custom_palette,
+                  size=1, palette=custom_palette,
                   dodge=True, legend=False, ax=axes,
                   linewidth=0.5,
                   edgecolor='face')
@@ -918,7 +918,7 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
 
 
 def figg_DA_vs_IRI_v2(master_df, IRI_group_size=50, axes=None):
-    data = master_df[(master_df['NRI'] >= master_df['IRI']) & (master_df['IRI'] > 1)]
+    data = master_df[(master_df['NRI'] >= master_df['IRI'])]
     # data = master_df
     if axes is None:
         fig, axes = plt.subplots(1, 1, figsize=(8, 4))
@@ -1028,10 +1028,16 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     # 'Group' is the variance of the random intercepts, not a fixed effect.
     # The 'Intercept' is often excluded from coefficient plots for clarity.
     conf_to_plot = conf.drop(index=['Group Var', 'Intercept'])
-    desired_order = ['logNRI', 'C(block, Treatment(reference='0.8'))[T.0.4]', 'logIRI', 'day_relative', 'session_of_day']
-    conf_to_plot = conf_to_plot.reindex(desired_order)
-    name_map = {'log(NRI)', 'block[T.low]', 'log(IRI)', 'day_relative', 'session_of_day'}
-    conf_to_plot = conf_to_plot.rename(index=name_map)
+    name_map = {
+        'C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'block',
+        'logNRI': 'log(NRI)',
+        'logIRI': 'log(IRI)',
+        'day_relative': 'day of recording',
+        'session_of_day': 'session of day'}
+    conf_to_plot_renamed = conf_to_plot.rename(index=name_map)
+    desired_order = ['log(NRI)', 'block', 'log(IRI)', 'day of recording', 'session of day']
+    conf_to_plot = conf_to_plot_renamed.reindex(desired_order)
+
 
     # Plot the confidence intervals
     errors = conf_to_plot['upper'] - conf_to_plot['estimate']
@@ -1041,22 +1047,27 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
         yerr=errors,
         fmt='o',  # 'o' for a dot, could be 's' for square, etc.
         color='black',
-        capsize=5,
+        capsize=2,
+        linewidth=0.75,
         linestyle='None',  # No line connecting the dots
-        markersize=8
+        markersize=3,
+        ecolor='red'
     )
 
     axes.axhline(y=0, color='grey', linestyle='--')
 
-    axes.set_title('Coefficient Plot with 95% Confidence Intervals', fontsize=16)
-    axes.set_ylabel('Coefficient Estimate', fontsize=12)
-    axes.set_xlabel('Predictor Variable', fontsize=12)
+    axes.set_title('Coefficient (95% CI)', y=0.9)
+    axes.set_ylabel('Coefficient Estimate')
+    axes.set_xlabel('Predictor Variable')
+    axes.set_xticklabels(axes.get_xticklabels(), rotation=15, ha='right')
+    axes.spines['right'].set_visible(False)
+    axes.spines['top'].set_visible(False)
 
     if return_handle:
         plt.tight_layout()
         fig.show()
         return fig, axes
-    print('hello')
+
 
 # def _calculate_experienced_reward_prob(DA_features_df):
 
@@ -1194,7 +1205,7 @@ def setup_axes_v2():
     row_1 = [8, 1, 2]
     row_2 = [1, 15, 2, 15, 30]
     col_1 = [1, 2, 2]
-    col_2 = [2, 2, 1]
+    col_2 = [2, 2, 2]
 
     row_1_margins = [4, 6]
     row_2_margins = [1, 1, 10, 8]
@@ -1385,8 +1396,13 @@ def main():
     figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=axes[12])
     print(f'figf_DA_vs_NRI_block_split_v2 took {time.time() - tic:.2f} seconds')
 
+    # tic = time.time()
+    # figef_DA_vs_NRI(master_DA_features_df, axes=axes[11:13])
+    # print(f'figef_DA_vs_NRI_took {time.time() - tic:.2f} seconds')
+
     tic = time.time()
-    figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=200, axes=axes[13])
+    # figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=450, axes=axes[13])
+    figg_LMEM_coefficients_v3(master_DA_features_df, axes=axes[13])
     print(f'figg_DA_vs_IRI_v2 took {time.time() - tic:.2f} seconds')
 
     y_limits = []
@@ -1419,7 +1435,7 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
+    main()
     ## --- Plot example trial 1d ---
     # animal_str = 'SZ036'
     # session_name = '2024-01-08T13_52'
@@ -1429,6 +1445,7 @@ if __name__ == '__main__':
     # trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
     #                                               file_format='parquet')
     # figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=None)
+    # figa_example_trial_legend(ax=None)
 
     ## --- Plot example sessions heatmap and average traces ---
     # animal_str = 'SZ036'
@@ -1441,15 +1458,15 @@ if __name__ == '__main__':
     # figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=None)
 
     ## --- Plot DA vs. NRI for all data ---
-    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                           day_0='2023-11-30', file_format='parquet')
-
-    animal_ids = ["RK007", "RK008"]
-    master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                           day_0='2025-06-17', file_format='parquet')
-    master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
-    figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
+    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                                        day_0='2023-11-30', file_format='parquet')
+    #
+    # animal_ids = ["RK007", "RK008"]
+    # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                                        day_0='2025-06-17', file_format='parquet')
+    # master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    # figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
     # figef_DA_vs_NRI(master_DA_features_df)
     # fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
     # figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=None)
