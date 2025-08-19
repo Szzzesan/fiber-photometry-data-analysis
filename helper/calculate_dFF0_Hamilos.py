@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from helper.beads_detrend import beads_detrend
 from helper.butterworth_detrend import butterworth_detrend
@@ -37,6 +38,11 @@ def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False'
     for i in range(num_color_site):
         F_0 = fitted.iloc[:, 2 * i + 1].rolling(window=F_0_framewindow, center=True).mean()
         dFF0.iloc[:, i + 1] = (fitted.iloc[:, 2 * i + 1] - fitted.iloc[:, 2 * (i + 1)]) / F_0
+        # subtracted = fitted.iloc[:, 2*i+1] - fitted.iloc[:, 2*(i+1)] + fitted.iloc[:, 2*(i+1)].median()
+        # pad_width = F_0_framewindow//2
+        # subtracted_padded = np.pad(subtracted, pad_width=pad_width, mode='edge')
+        # F_0 = pd.Series(subtracted_padded).rolling(window=F_0_framewindow, center=True).mean().iloc[pad_width:-pad_width].reset_index(drop=True)
+        # dFF0.iloc[:, i + 1] = (fitted.iloc[:, 2 * i + 1] - F_0) / F_0
     # endregion
 
     dFF0.iloc[:, 0] = dFF0.iloc[:, 0].div(1000)

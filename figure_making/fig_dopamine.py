@@ -75,7 +75,7 @@ def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     draw_vertical_lines(ax, exits, color='r', linestyle='--')
     draw_vertical_lines(ax, rewards, color='b')
     ax.plot(relative_time, DA_trace_to_plot, color='black')
-    ax.set_xlim([-1, 15])
+    # ax.set_xlim([-1, 15])
     ax.set_xticks(np.arange(0, 15.5, 2.5))
     ax.set_xlabel('Time since Trial Starts (s)')
     ax.set_ylabel('DA (z-score)')
@@ -1368,6 +1368,7 @@ def main():
     master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
                                                                            day_0='2025-06-17', file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+
     # --- end of data preparation ---
 
     # --- set up axes and add figures to axes ---
@@ -1436,7 +1437,7 @@ def main():
 
 if __name__ == '__main__':
     main()
-    ## --- Plot example trial 1d ---
+    # # --- Plot example trial 1d ---
     # animal_str = 'SZ036'
     # session_name = '2024-01-08T13_52'
     # zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
@@ -1444,10 +1445,10 @@ if __name__ == '__main__':
     #                                                           file_format='parquet')
     # trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
     #                                               file_format='parquet')
-    # figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=None)
-    # figa_example_trial_legend(ax=None)
-
-    ## --- Plot example sessions heatmap and average traces ---
+    # for trial in trial_df['trial'].unique():
+    #     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=trial, ax=None)
+    #
+    # # --- Plot example sessions heatmap and average traces ---
     # animal_str = 'SZ036'
     # session_name = '2023-12-30T19_57'
     # zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
