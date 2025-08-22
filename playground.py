@@ -1,9 +1,10 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 
 
-
+df = pd.read_pickle('virus.pkl')
 
 
 # Simulated nonlinear signal
