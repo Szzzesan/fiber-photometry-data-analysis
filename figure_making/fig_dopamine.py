@@ -1,5 +1,6 @@
 from matplotlib import gridspec
 from matplotlib.transforms import ScaledTranslation
+import matplotlib.image as mpimg
 
 import data_loader
 import helper
@@ -127,6 +128,21 @@ def figa_example_trial_legend(ax=None):
     else:
         return ax
 
+
+def figb_histology(title, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(3, 2))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+    img = mpimg.imread(title)
+    ax.imshow(img)
+    ax.axis("off")
+    if return_handle:
+        fig.tight_layout()
+        fig.show()
+        return fig, ax
 
 def resample_data_for_heatmap(zscore, reward_df, cutoff_pre_reward=-0.5, cutoff_post_reward=2, bin_size_s=0.05,
                               category_by='time_in_port'):
@@ -1037,6 +1053,7 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     conf_to_plot_renamed = conf_to_plot.rename(index=name_map)
     desired_order = ['log(NRI)', 'block', 'log(IRI)', 'day of recording', 'session of day']
     conf_to_plot = conf_to_plot_renamed.reindex(desired_order)
+    conf_to_plot = conf_to_plot.drop(index=['day of recording', 'session of day'])
 
 
     # Plot the confidence intervals
@@ -1259,8 +1276,8 @@ def setup_axes_v2():
         fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_2_splits[-2]:row_2_splits[-1]]),
         # DA vs. NRI but split by blocks from all animals
         fig.add_subplot(gs[col_2_splits[5]:col_2_splits[6],
-                        row_2_splits[-2]:row_2_splits[-1]])
-        # DA vs. IRI
+                        row_2_splits[-2]:int((row_2_splits[-1] - row_2_splits[-2])/2 + row_2_splits[-2])]),
+        # coefficient plot
 
     ]
 
@@ -1276,7 +1293,7 @@ def setup_axes_v2():
             0.0, 1.0, lettering[i], transform=(
                     axes[ax].transAxes + ScaledTranslation(-20 / 72, +7 / 72, fig.dpi_scale_trans)),
             fontsize='large', va='bottom', fontfamily='sans-serif', weight='bold')
-
+    fig.subplots_adjust(left=0.04, right=0.98, top=0.96, bottom=0.08)
     axes = np.array(axes)
     return axes
 
@@ -1378,6 +1395,11 @@ def main():
     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=axes[0])
     figa_example_trial_legend(ax=axes[1])
     print(f'figa_example_trial took {time.time() - tic:.2f} seconds')
+
+    tic = time.time()
+    # figc_example_session_heatmap_split_by_NRI_v2(zscore_heatmap, reward_df, DA_features_df, axes=axes[3:7])
+    figb_histology('merged_histology.png', ax=axes[2])
+    print(f'figbhistology took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
     # figc_example_session_heatmap_split_by_NRI_v2(zscore_heatmap, reward_df, DA_features_df, axes=axes[3:7])
