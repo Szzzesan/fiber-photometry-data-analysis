@@ -1027,8 +1027,13 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     df['animal_hemisphere'] = df['animal'].astype(str) + '_' + df['hemisphere'].astype(str)
     df['logNRI'] = np.log(df['NRI'])
     df['logIRI'] = np.log(df['IRI'])
+    # Standardize the continuous variables using z-scoring
+    for col in ['logNRI', 'logIRI']:
+        mean = df[col].mean()
+        std = df[col].std()
+        df[f'{col}_std'] = (df[col] - mean) / std
     model = smf.mixedlm(
-        "DA ~ logNRI + logIRI + C(block, Treatment(reference='0.8')) + day_relative + session_of_day",
+        "DA ~ logNRI_std + logIRI_std + C(block, Treatment(reference='0.8')) + day_relative + session_of_day",
         data=df,
         groups=df["animal_hemisphere"]
     )
@@ -1046,8 +1051,8 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     conf_to_plot = conf.drop(index=['Group Var', 'Intercept'])
     name_map = {
         'C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'block',
-        'logNRI': 'log(NRI)',
-        'logIRI': 'log(IRI)',
+        'logNRI_std': 'log(NRI)',
+        'logIRI_std': 'log(IRI)',
         'day_relative': 'day of recording',
         'session_of_day': 'session of day'}
     conf_to_plot_renamed = conf_to_plot.rename(index=name_map)
