@@ -1498,7 +1498,7 @@ if __name__ == '__main__':
     test_session.process_behavior_data(save=0)
     # test_session.save_pi_events(format='parquet')
     test_session.construct_trial_df()
-    test_session.save_trial_df(format='parquet')
+    # test_session.save_trial_df(format='parquet')
     test_session.construct_expreward_interval_df()
     test_session.save_expreward_df(format='parquet')
     # test_session.extract_bg_behav_by_trial()
