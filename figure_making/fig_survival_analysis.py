@@ -6,12 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def main():
-    animal_str = 'SZ036'
-    session_name = '2024-01-08T13_52'
-    trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df',
-                                                  session_long_name=session_name,
-                                                  file_format='parquet')
+def plot_kaplan_meier(trial_df):
     trial_df['leave_time'] = trial_df['exp_exit'] - trial_df['exp_entry']
     trial_df['event_observed'] = 1
 
@@ -36,6 +31,9 @@ def main():
     plt.grid(True)
     plt.show()
 
+def perform_log_rank_test(trial_df):
+    trial_df['leave_time'] = trial_df['exp_exit'] - trial_df['exp_entry']
+    trial_df['event_observed'] = 1
     # log-rank test
     high_mask = trial_df['phase'] == '0.8'
     low_mask = trial_df['phase'] == '0.4'
@@ -47,6 +45,16 @@ def main():
     )
     print("\nLog-rank test results:")
     results.print_summary()
+
+def main():
+    animal_str = 'SZ036'
+    for i in range(0, 15):
+        session_name = '2024-01-08T13_52'
+        trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df',
+                                                      session_id=i,
+                                                      file_format='parquet')
+        plot_kaplan_meier(trial_df)
+
 
 
 if __name__ == '__main__':
