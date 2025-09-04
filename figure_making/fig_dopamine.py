@@ -144,7 +144,7 @@ def figb_histology(title, ax=None):
         fig.show()
         return fig, ax
 
-def resample_data_for_heatmap(zscore, reward_df, cutoff_pre_reward=-0.5, cutoff_post_reward=2, bin_size_s=0.05,
+def resample_data_for_heatmap(zscore, zscore_branch, reward_df, cutoff_pre_reward=-0.5, cutoff_post_reward=2, bin_size_s=0.05,
                               category_by='time_in_port'):
     """
     This function put the time series data on a canvas that aligns them with each reward in time investment port.
@@ -188,7 +188,7 @@ def resample_data_for_heatmap(zscore, reward_df, cutoff_pre_reward=-0.5, cutoff_
         raise ValueError("category_by must be 'time_in_port' or 'block'")
 
     original_timestamps = zscore['time_recording'].values
-    original_zscore = zscore['green_left'].values
+    original_zscore = zscore[zscore_branch].values
 
     uniform_time_vector = np.arange(cutoff_pre_reward, cutoff_post_reward + bin_size_s, bin_size_s)
     heatmap_matrix = np.full((len(sorted_df), len(uniform_time_vector)), np.nan)
@@ -520,9 +520,9 @@ def plot_heatmap_and_scatters(time_vector, category_codes, cat_labels, heatmap_m
         fig.show()
 
 
-def figc_example_session_heatmap_split_by_NRI_v2(zscore, reward_df, DA_features_df, axes=None):
+def figc_example_session_heatmap_split_by_NRI_v2(zscore, zscore_branch, reward_df, DA_features_df, axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
-        zscore, reward_df,
+        zscore, zscore_branch, reward_df,
         cutoff_pre_reward=-0.5,
         cutoff_post_reward=2,
         bin_size_s=0.05,
@@ -535,9 +535,9 @@ def figc_example_session_heatmap_split_by_NRI_v2(zscore, reward_df, DA_features_
                               axes=axes)
 
 
-def figc_example_session_heatmap_split_by_NRI(zscore, reward_df, axes=None):
+def figc_example_session_heatmap_split_by_NRI(zscore, zscore_branch, reward_df, axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
-        zscore, reward_df,
+        zscore, zscore_branch, reward_df,
         cutoff_pre_reward=-0.5,
         cutoff_post_reward=2,
         bin_size_s=0.05,
@@ -548,9 +548,9 @@ def figc_example_session_heatmap_split_by_NRI(zscore, reward_df, axes=None):
 
 
 
-def figd_example_session_heatmap_split_by_block_v2(zscore, reward_df, DA_features_df, axes=None):
+def figd_example_session_heatmap_split_by_block_v2(zscore, zscore_branch, reward_df, DA_features_df, axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
-        zscore, reward_df,
+        zscore, zscore_branch, reward_df,
         cutoff_pre_reward=-0.5,
         cutoff_post_reward=2,
         bin_size_s=0.05,
@@ -562,9 +562,9 @@ def figd_example_session_heatmap_split_by_block_v2(zscore, reward_df, DA_feature
                               split_by_block=1,
                               axes=axes)
 
-def figd_example_session_heatmap_split_by_block(zscore, reward_df, axes=None):
+def figd_example_session_heatmap_split_by_block(zscore, zscore_branch, reward_df, axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
-        zscore, reward_df,
+        zscore, zscore_branch, reward_df,
         cutoff_pre_reward=-0.5,
         cutoff_post_reward=2,
         bin_size_s=0.05,
@@ -1376,9 +1376,16 @@ def main():
 
     animal_str = 'SZ036'
     session_name = '2023-12-30T19_57'
-    zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
+    zscore_heatmap_figc = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
                                                         file_format='parquet')
-    reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
+    reward_df_figc = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
+                                                   file_format='parquet')
+
+    animal_str = 'SZ042'
+    session_name = '2023-12-11T21_06'
+    zscore_heatmap_figd = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
+                                                        file_format='parquet')
+    reward_df_figd = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
                                                    file_format='parquet')
 
     animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
@@ -1407,13 +1414,13 @@ def main():
     print(f'figbhistology took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    # figc_example_session_heatmap_split_by_NRI_v2(zscore_heatmap, reward_df, DA_features_df, axes=axes[3:7])
-    figc_example_session_heatmap_split_by_NRI(zscore_heatmap, reward_df, axes=axes[3:7])
+    # figc_example_session_heatmap_split_by_NRI_v2(zscore_heatmap, 'green_left', reward_df, DA_features_df, axes=axes[3:7])
+    figc_example_session_heatmap_split_by_NRI(zscore_heatmap_figc, 'green_left', reward_df_figc, axes=axes[3:7])
     print(f'figc_example_session_heatmap_split_by_NRI took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    # figd_example_session_heatmap_split_by_block_v2(zscore_heatmap, reward_df, DA_features_df, axes=axes[7:11])
-    figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=axes[7:11])
+    # figd_example_session_heatmap_split_by_block_v2(zscore_heatmap, 'green_left', reward_df, DA_features_df, axes=axes[7:11])
+    figd_example_session_heatmap_split_by_block(zscore_heatmap_figd, 'green_left', reward_df_figd, axes=axes[7:11])
     print(f'figd_example_session_heatmap_split_by_block took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
@@ -1464,6 +1471,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
     # # --- Plot example trial 1d ---
     # animal_str = 'SZ036'
     # session_name = '2024-01-08T13_52'
@@ -1512,8 +1520,8 @@ if __name__ == '__main__':
 
     ## --- Plot heatmaps from every single session ---
     # tuple_list = [('SZ036', 16), ('SZ037', 25), ('SZ038', 29), ('SZ039', 20), ('SZ042', 20), ('SZ043', 18),
-    #               ('RK007', 19), ('RK009', 15), ('RK008', 25), ('RK010', 13)]
-    # for (ani, session_num) in tuple_list[8:10]:
+    #               ('RK007', 19), ('RK008', 11)]
+    # for (ani, session_num) in tuple_list[:]:
     #     animal_str = ani
     #     # # session_name = '2024-01-04T15_49'
     #     for i in range(0, session_num):
@@ -1535,17 +1543,17 @@ if __name__ == '__main__':
     #                                      session_name=session_name, axes=None)
     #
     #
-    #         time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
-    #             zscore_heatmap, reward_df,
-    #             cutoff_pre_reward=-0.5,
-    #             cutoff_post_reward=2,
-    #             bin_size_s=0.05,
-    #             category_by='block'  # Use 'block' to test the new logic
-    #         )
-    #         plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
-    #                                      legend_title='Context Reward Rate', session_name=session_name, axes=None)
-    #
-    #         time.sleep(2)
+            # time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
+            #     zscore_heatmap, reward_df,
+            #     cutoff_pre_reward=-0.5,
+            #     cutoff_post_reward=2,
+            #     bin_size_s=0.05,
+            #     category_by='block'  # Use 'block' to test the new logic
+            # )
+            # plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
+            #                              legend_title='Context Reward Rate', session_name=session_name, axes=None)
+            #
+            # time.sleep(2)
 
 
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
