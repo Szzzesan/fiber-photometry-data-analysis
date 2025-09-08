@@ -23,6 +23,7 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
 import matplotlib.ticker as mticker
+
 # import cmasher
 
 mpl.rcParams['figure.dpi'] = 300
@@ -43,7 +44,8 @@ mpl.rcParams['figure.dpi'] = 300
 
 # --- First plotting method starts here ---
 def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
-    assert example_trial_id in set(trial_df['trial']), f"example_trial_id {example_trial_id} not found in trial_df['trial']"
+    assert example_trial_id in set(
+        trial_df['trial']), f"example_trial_id {example_trial_id} not found in trial_df['trial']"
     row_id_bool = trial_df['trial'] == example_trial_id
     snippet_begin = trial_df.loc[row_id_bool, 'bg_entry'].values[0]
     snippet_end = trial_df.loc[row_id_bool, 'exp_exit'].values[0]
@@ -144,7 +146,9 @@ def figb_histology(title, ax=None):
         fig.show()
         return fig, ax
 
-def resample_data_for_heatmap(zscore, zscore_branch, reward_df, cutoff_pre_reward=-0.5, cutoff_post_reward=2, bin_size_s=0.05,
+
+def resample_data_for_heatmap(zscore, zscore_branch, reward_df, cutoff_pre_reward=-0.5, cutoff_post_reward=2,
+                              bin_size_s=0.05,
                               category_by='time_in_port'):
     """
     This function put the time series data on a canvas that aligns them with each reward in time investment port.
@@ -173,7 +177,7 @@ def resample_data_for_heatmap(zscore, zscore_branch, reward_df, cutoff_pre_rewar
         qt1 = np.round(valid_df['time_in_port'].quantile(0.25), 1)
         qt2 = np.round(valid_df['time_in_port'].quantile(0.5), 1)
         qt3 = np.round(valid_df['time_in_port'].quantile(0.75), 1)
-        bins= [0, qt1, qt2, qt3, np.inf]
+        bins = [0, qt1, qt2, qt3, np.inf]
         cat_labels = [f'{bins[i]}-{bins[i + 1]}' for i in range(len(bins) - 1)]
         cat_labels[-1] = f'>{bins[-2]}'
         valid_df['cat_code'] = pd.cut(valid_df['time_in_port'], bins=bins, labels=False, right=False)
@@ -352,9 +356,9 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
     # ax_mean.set_ylim([-1.6, 3.7])
     ax_mean.set_ylabel('Mean DA (z-score)', labelpad=-6, y=0.55)
     leg = ax_mean.legend(title=legend_title,
-                   prop={'weight': 'normal', 'size': 'small'},
-                   title_fontproperties={'weight': 'normal', 'size': 'small'},
-                   handlelength=2, borderpad=0.4)
+                         prop={'weight': 'normal', 'size': 'small'},
+                         title_fontproperties={'weight': 'normal', 'size': 'small'},
+                         handlelength=2, borderpad=0.4)
     leg.get_title().set_ha('center')
 
     for ax in [ax_heatmap, ax_mean]:
@@ -404,7 +408,6 @@ def plot_DA_vs_NRI_scatters_with_average_curve(master_df, split_block=0, axes=No
     # line = ax.plot(x, y, linewidth=1.5, alpha=0.8, label=animal)
     # ax.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.5)
     # ax.legend(title='Context\nReward Rate', fontsize='small')
-
 
     ax.set_xlim([-0.1, 11])
     # ax.set_ylim([0, 6])
@@ -547,7 +550,6 @@ def figc_example_session_heatmap_split_by_NRI(zscore, zscore_branch, reward_df, 
                                  legend_title='Reward Time\nfrom Entry (s)', axes=axes)
 
 
-
 def figd_example_session_heatmap_split_by_block_v2(zscore, zscore_branch, reward_df, DA_features_df, axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
         zscore, zscore_branch, reward_df,
@@ -561,6 +563,7 @@ def figd_example_session_heatmap_split_by_block_v2(zscore, zscore_branch, reward
                               split_cat=1,
                               split_by_block=1,
                               axes=axes)
+
 
 def figd_example_session_heatmap_split_by_block(zscore, zscore_branch, reward_df, axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
@@ -697,20 +700,28 @@ def _prepare_binned_data(master_df, group_by_cols):
     ).reset_index()
     return summary_data
 
+
+def _prepare_collapsed_block_split_data(master_df):
+    data = master_df[master_df['IRI'] > 1].copy()
+    summary_data = data.groupby(['animal', 'session', 'hemisphere', 'block'], observed=True).agg(
+        DA=('DA', 'mean')).reset_index()
+    return summary_data
+
+
 def _paired_t_for_NRI_bins(summary_data):
     cat_code = summary_data['cat_code'].unique()
     grouped = summary_data.groupby(['animal', 'session'])
     compared = []
     paired_t_stats = []
     paired_p_values = []
-    for i in range(len(cat_code)-1):
+    for i in range(len(cat_code) - 1):
         cat1 = cat_code[i]
-        cat2 = cat_code[i+1]
+        cat2 = cat_code[i + 1]
         DA_early = []
         DA_late = []
         for (animal, session), group in grouped:
-            DA1 = group.loc[group['cat_code']==cat1, 'DA'].values
-            DA2 = group.loc[group['cat_code']==cat2, 'DA'].values
+            DA1 = group.loc[group['cat_code'] == cat1, 'DA'].values
+            DA2 = group.loc[group['cat_code'] == cat2, 'DA'].values
             if (len(DA1) == 1) & (len(DA2) == 1):
                 DA_early.append(DA1[0])
                 DA_late.append(DA2[0])
@@ -720,6 +731,7 @@ def _paired_t_for_NRI_bins(summary_data):
         paired_p_values.append(p_value)
         print(f't_stat = {t_stat:.3f}, p_value = {p_value:.4f}')
     return compared, paired_t_stats, paired_p_values
+
 
 def _paired_t_for_blocks(summary_data):
     grouped = summary_data.groupby(['session'])
@@ -743,6 +755,13 @@ def _paired_t_for_blocks(summary_data):
         paired_p_values.append(p_value)
         print(f't_stat = {t_stat:.3f}, p_value = {p_value:.4f}')
     return compared, paired_t_stats, paired_p_values
+
+def _paired_t_for_collapsed_blocks(grouped_data):
+    pivot_df = grouped_data.pivot_table(index=['session', 'hemisphere'], columns='block', values='DA')
+    DA_low = pivot_df['0.4']
+    DA_high = pivot_df['0.8']
+    t_stat, p_value = stats.ttest_rel(DA_low, DA_high)
+    return t_stat, p_value
 
 def _set_axes_for_box_and_swarm(axes):
     axes.set_xticklabels(axes.get_xticklabels(), rotation=15, ha='right')
@@ -794,16 +813,16 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
             annot = "*"
         else:
             annot = 'ns'
-        x_center1, x_center2 = center, center+1
+        x_center1, x_center2 = center, center + 1
         inset = 0.05
         bracket_x1 = x_center1 + inset
         bracket_x2 = x_center2 - inset
         y, h = y_bars[center], 0.1
         col = 'k'
         axes.plot([bracket_x1, bracket_x1, bracket_x2, bracket_x2],
-                [y, y + h, y + h, y], lw=1, c=col)
-        axes.text((bracket_x1 + bracket_x2) * 0.5, y + h/2, annot,
-                ha='center', va='bottom', color=col, fontsize=10)
+                  [y, y + h, y + h, y], lw=1, c=col)
+        axes.text((bracket_x1 + bracket_x2) * 0.5, y + h / 2, annot,
+                  ha='center', va='bottom', color=col, fontsize=10)
 
     for patch in axes.patches:
         r, g, b, a = patch.get_facecolor()
@@ -881,16 +900,16 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
             annot = "*"
         else:
             annot = 'ns'
-        x_center1, x_center2 = center-0.2, center+0.2
+        x_center1, x_center2 = center - 0.2, center + 0.2
         inset = 0.05
         bracket_x1 = x_center1 + inset
         bracket_x2 = x_center2 - inset
         y, h = y_bars[center], 0.1
         col = 'k'
         axes.plot([bracket_x1, bracket_x1, bracket_x2, bracket_x2],
-                [y, y + h, y + h, y], lw=1, c=col)
-        axes.text((bracket_x1 + bracket_x2) * 0.5, y + h/2, annot,
-                ha='center', va='bottom', color=col, fontsize=10)
+                  [y, y + h, y + h, y], lw=1, c=col)
+        axes.text((bracket_x1 + bracket_x2) * 0.5, y + h / 2, annot,
+                  ha='center', va='bottom', color=col, fontsize=10)
 
     std = session_summary_data.groupby(['cat_code', 'block'])['DA'].transform('std')
     mean = session_summary_data.groupby(['cat_code'])['DA'].transform('mean')
@@ -911,21 +930,86 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
         collection.set_facecolors(face_colors)
     _set_axes_for_box_and_swarm(axes)
 
-    # handles, _ = axes.get_legend_handles_labels()
-    # new_labels = ['Low', 'High']
-    # # axes.legend(handles, new_labels, title='Context\nReward Rate', bbox_to_anchor=(1.02, 1), loc='upper left')
-    # axes.legend(
-    #     handles,
-    #     new_labels,
-    #     title='Block',
-    #     bbox_to_anchor=(0.01, 1),
-    #     loc='upper left',
-    #     fontsize='x-small',  # Smaller font for legend labels
-    #     title_fontsize='10',  # Smaller font for the title
-    #     labelspacing=0.4,  # Less vertical space between entries
-    #     handletextpad=0.3,  # Less space between the color handle and the text
-    #     borderpad=0.1  # Less padding inside the legend box border
-    # )
+    if return_handle:
+        fig.tight_layout()
+        fig.show()
+        return fig, axes
+
+
+def figf_summary_block_split(master_df, axes=None):
+    if axes is None:
+        fig, axes = plt.subplots(1, 1, figsize=(2, 4))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+
+    master_df = master_df[master_df['IRI'] > 1].copy()
+    block_palette = sns.color_palette('Set2', 2)
+    hue_order = ['0.4', '0.8']
+    custom_palette = {'0.4': block_palette[0], '0.8': block_palette[1]}
+
+    grouped_data = _prepare_collapsed_block_split_data(master_df)
+    sns.boxplot(data=grouped_data,
+                x='block',
+                y='DA',
+                order=['0.4', '0.8'],
+                palette=custom_palette,
+                notch=True,
+                boxprops=dict(alpha=0.4),
+                width=0.4,
+                medianprops={'linewidth': 1, 'color': 'black'},
+                legend=False,
+                showfliers=False,
+                ax=axes)
+
+
+    # Add stats annotation
+    t_stat, p_value = _paired_t_for_collapsed_blocks(grouped_data)
+    if p_value < 0.0001:
+        annot = "****"
+    elif p_value < 0.001:
+        annot = "***"
+    elif p_value < 0.01:
+        annot = "**"
+    elif p_value < 0.05:
+        annot = "*"
+    else:
+        annot = 'ns'
+    y_bar = 5
+    center_x1, center_x2 = 0, 1
+    inset = 0.05
+    bracket_x1 = center_x1 + inset
+    bracket_x2 = center_x2 - inset
+    y, h = y_bar, 0.1
+    col = 'k'
+    axes.plot([bracket_x1, bracket_x1, bracket_x2, bracket_x2],
+              [y, y + h, y + h, y], lw=1, c=col)
+    axes.text((bracket_x1 + bracket_x2) * 0.5, y + h / 2, annot,
+              ha='center', va='bottom', color=col, fontsize=10)
+
+    sns.swarmplot(data=grouped_data,
+                  x='block',
+                  y='DA',
+                  order=['0.4', '0.8'],
+                  palette=custom_palette,
+                  size=1,
+                  legend=False,
+                  linewidth=0.5,
+                  edgecolor='face',
+                  ax=axes)
+    fill_alpha = 0.5
+    for collection in axes.collections:
+        face_colors = collection.get_facecolors()
+        face_colors[:, 3] = fill_alpha
+        collection.set_facecolors(face_colors)
+
+    axes.set_xticks([0, 1], ['Low', 'High'], fontsize='small')
+    axes.set_xlabel('Context\nReward Rate')
+    axes.set_ylabel("")
+    axes.set_yticklabels([])
+    axes.spines['right'].set_visible(False)
+    axes.spines['top'].set_visible(False)
 
     if return_handle:
         fig.tight_layout()
@@ -1016,6 +1100,7 @@ def figg_DA_vs_IRI(master_df, axes=None):
         fig.show()
         return fig, axes
 
+
 def figg_LMEM_coefficients_v3(master_df, axes=None):
     df = master_df[(master_df['IRI'] > 1)]
     if axes is None:
@@ -1059,7 +1144,6 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     desired_order = ['log(NRI)', 'block', 'log(IRI)', 'day of recording', 'session of day']
     conf_to_plot = conf_to_plot_renamed.reindex(desired_order)
     conf_to_plot = conf_to_plot.drop(index=['day of recording', 'session of day'])
-
 
     # Plot the confidence intervals
     errors = conf_to_plot['upper'] - conf_to_plot['estimate']
@@ -1226,16 +1310,23 @@ def setup_axes_v2():
 
     row_1 = [8, 1, 2]
     row_2 = [1, 15, 2, 15, 30]
+    row_3 = [5, 1]
     col_1 = [1, 2, 2]
     col_2 = [2, 2, 2]
 
     row_1_margins = [4, 6]
     row_2_margins = [1, 1, 10, 8]
+    row_3_margins = [3]
     col_1_margins = [10, 10]
     col_2_margins = [10, 10]
 
     row_1_splits = [int((cols - np.sum(row_1_margins)) * h / sum(row_1)) for h in row_1]
     row_2_splits = [int((cols - np.sum(row_2_margins)) * h / sum(row_2)) for h in row_2]
+    row_3_splits = [
+        int((cols - np.sum(row_3_margins) - np.sum(row_2_splits[0:4]) - np.sum(row_2_margins[0:4])) * h / sum(row_3))
+        for h in row_3]
+    row_3_splits = row_2_splits[0:4] + row_3_splits
+    row_3_margins = row_2_margins[0:4] + row_3_margins
     col_1_splits = [int((rows - np.sum(col_1_margins)) * h / sum(col_1)) for h in col_1]
     col_2_splits = [int((rows - np.sum(col_2_margins) - col_1_splits[0] - col_1_margins[0]) * h / sum(col_2)) for h in
                     col_2]
@@ -1244,16 +1335,19 @@ def setup_axes_v2():
 
     row_1_splits = [val for pair in zip(row_1_splits, row_1_margins + [0]) for val in pair][:-1]
     row_2_splits = [val for pair in zip(row_2_splits, row_2_margins + [0]) for val in pair][:-1]
+    row_3_splits = [val for pair in zip(row_3_splits, row_3_margins + [0]) for val in pair][:-1]
     col_1_splits = [val for pair in zip(col_1_splits, col_1_margins + [0]) for val in pair][:-1]
     col_2_splits = [val for pair in zip(col_2_splits, col_2_margins + [0]) for val in pair][:-1]
 
     row_1_splits = np.cumsum(row_1_splits)
     row_2_splits = np.cumsum(row_2_splits)
+    row_3_splits = np.cumsum(row_3_splits)
     col_1_splits = np.cumsum(col_1_splits)
     col_2_splits = np.cumsum(col_2_splits)
 
     row_1_splits[-1] = cols
     row_2_splits[-1] = cols
+    row_3_splits[-1] = cols
     col_1_splits += rows - col_1_splits[-1]
     col_2_splits[1:] += rows - col_2_splits[-1]
 
@@ -1278,10 +1372,12 @@ def setup_axes_v2():
 
         fig.add_subplot(gs[col_2_splits[1]:col_2_splits[2], row_2_splits[-2]:row_2_splits[-1]]),
         # DA vs. NRI for all animals
-        fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_2_splits[-2]:row_2_splits[-1]]),
+        fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_3_splits[-4]:row_3_splits[-3]]),
         # DA vs. NRI but split by blocks from all animals
+        fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_3_splits[-2]:row_3_splits[-1]]),
+        # block comparison collapsed across all delays
         fig.add_subplot(gs[col_2_splits[5]:col_2_splits[6],
-                        row_2_splits[-2]:int((row_2_splits[-1] - row_2_splits[-2])/2 + row_2_splits[-2])]),
+                        row_2_splits[-2]:int((row_2_splits[-1] - row_2_splits[-2]) / 2 + row_2_splits[-2])]),
         # coefficient plot
 
     ]
@@ -1292,7 +1388,7 @@ def setup_axes_v2():
     #     ax.spines['top'].set_visible(False)
 
     lettering = 'abcdefghijklmnopqrstuvwxyz'
-    axes_to_letter = [0, 2, 3, 7, 11, 12, 13]
+    axes_to_letter = [0, 2, 3, 7, 11, 12, 14]
     for i, ax in enumerate(axes_to_letter):
         axes[ax].text(
             0.0, 1.0, lettering[i], transform=(
@@ -1377,25 +1473,25 @@ def main():
     animal_str = 'SZ036'
     session_name = '2023-12-30T19_57'
     zscore_heatmap_figc = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
-                                                        file_format='parquet')
+                                                             file_format='parquet')
     reward_df_figc = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
-                                                   file_format='parquet')
+                                                        file_format='parquet')
 
     animal_str = 'SZ042'
     session_name = '2023-12-11T21_06'
     zscore_heatmap_figd = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
-                                                        file_format='parquet')
+                                                             file_format='parquet')
     reward_df_figd = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
-                                                   file_format='parquet')
+                                                        file_format='parquet')
 
     animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # animal_ids=["SZ036"]
     master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                           day_0='2023-11-30', file_format='parquet')
+                                                                day_0='2023-11-30', file_format='parquet')
 
     animal_ids = ["RK007", "RK008"]
     master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                           day_0='2025-06-17', file_format='parquet')
+                                                                day_0='2025-06-17', file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
 
     # --- end of data preparation ---
@@ -1436,17 +1532,21 @@ def main():
     # print(f'figef_DA_vs_NRI_took {time.time() - tic:.2f} seconds')
 
     tic = time.time()
-    # figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=450, axes=axes[13])
-    figg_LMEM_coefficients_v3(master_DA_features_df, axes=axes[13])
+    figf_summary_block_split(master_DA_features_df, axes=axes[13])
+    print(f'figf_summary_block_split took {time.time() - tic:.2f} seconds')
+
+    tic = time.time()
+    # figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=450, axes=axes[14])
+    figg_LMEM_coefficients_v3(master_DA_features_df, axes=axes[14])
     print(f'figg_DA_vs_IRI_v2 took {time.time() - tic:.2f} seconds')
 
     y_limits = []
-    for ax in axes[11:13]:
+    for ax in axes[11:14]:
         y_limits.extend(ax.get_ylim())
     global_y_min = min(y_limits)
     global_y_max = max(y_limits)
     # print(f'lower bound of y: {global_y_min}; upper bound of y: {global_y_max}')
-    for ax in axes[11:13]:
+    for ax in axes[11:14]:
         ax.set_ylim(global_y_min, global_y_max)
 
     # tic = time.time()
@@ -1496,12 +1596,13 @@ if __name__ == '__main__':
     ## --- Plot DA vs. NRI for all data ---
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-    #                                                                        day_0='2023-11-30', file_format='parquet')
+    #                                                             day_0='2023-11-30', file_format='parquet')
     #
     # animal_ids = ["RK007", "RK008"]
     # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-    #                                                                        day_0='2025-06-17', file_format='parquet')
+    #                                                             day_0='2025-06-17', file_format='parquet')
     # master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    # figf_summary_block_split(master_DA_features_df, axes=None)
     # figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
     # figef_DA_vs_NRI(master_DA_features_df)
     # fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
@@ -1543,18 +1644,17 @@ if __name__ == '__main__':
     #                                      session_name=session_name, axes=None)
     #
     #
-            # time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
-            #     zscore_heatmap, reward_df,
-            #     cutoff_pre_reward=-0.5,
-            #     cutoff_post_reward=2,
-            #     bin_size_s=0.05,
-            #     category_by='block'  # Use 'block' to test the new logic
-            # )
-            # plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
-            #                              legend_title='Context Reward Rate', session_name=session_name, axes=None)
-            #
-            # time.sleep(2)
-
+    # time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
+    #     zscore_heatmap, reward_df,
+    #     cutoff_pre_reward=-0.5,
+    #     cutoff_post_reward=2,
+    #     bin_size_s=0.05,
+    #     category_by='block'  # Use 'block' to test the new logic
+    # )
+    # plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
+    #                              legend_title='Context Reward Rate', session_name=session_name, axes=None)
+    #
+    # time.sleep(2)
 
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # # animal_ids = ["SZ036"]
