@@ -74,7 +74,7 @@ def load_session_dataframe(animal_id, df_name, session_id=None, session_long_nam
         return None
 
 
-def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, file_format='parquet'):
+def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, hemisphere_qc=1, file_format='parquet'):
     """
     Loads and concatenates data files for a list of animals.
 
@@ -134,12 +134,14 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, file_format='
                 print(f"Unsupported file format: {file_format}")
                 continue
 
-            masks_to_keep = []
-            for hemi in animal_rules:
-                masks_to_keep.append(df['hemisphere'] == hemi)
-            if masks_to_keep:
-                final_mask = np.logical_or.reduce(masks_to_keep)
-                df = df[final_mask].reset_index(drop=True)
+            if hemisphere_qc:
+                masks_to_keep = []
+                for hemi in animal_rules:
+                    masks_to_keep.append(df['hemisphere'] == hemi)
+                if masks_to_keep:
+                    final_mask = np.logical_or.reduce(masks_to_keep)
+                    df = df[final_mask].reset_index(drop=True)
+
             if not df.empty:
                 df['animal'] = animal
                 df['session'] = session_data['id']
