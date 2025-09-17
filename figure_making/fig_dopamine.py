@@ -1487,11 +1487,11 @@ def main():
     animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # animal_ids=["SZ036"]
     master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                day_0='2023-11-30', file_format='parquet')
+                                                                day_0='2023-11-30', hemisphere_qc=1, file_format='parquet')
 
     animal_ids = ["RK007", "RK008"]
     master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                day_0='2025-06-17', file_format='parquet')
+                                                                day_0='2025-06-17', hemisphere_qc=1, file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
 
     # --- end of data preparation ---
