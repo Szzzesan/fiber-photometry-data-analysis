@@ -137,10 +137,17 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, hemisphere_qc
             if hemisphere_qc:
                 masks_to_keep = []
                 for hemi in animal_rules:
-                    masks_to_keep.append(df['hemisphere'] == hemi)
+                    if 'hemisphere' in df.columns:
+                        masks_to_keep.append(df['hemisphere'] == hemi)
+                    elif 'branch' in df.columns:
+                        branch_value = f"green_{hemi}"  # This creates "green_left" if hemi is "left"
+                        masks_to_keep.append(df['branch'] == branch_value)
+                    else:
+                        print("Warning: Neither 'hemisphere' nor 'branch' column was found.")
                 if masks_to_keep:
                     final_mask = np.logical_or.reduce(masks_to_keep)
                     df = df[final_mask].reset_index(drop=True)
+
 
             if not df.empty:
                 df['animal'] = animal
