@@ -3,6 +3,7 @@
 # Ignore temporary development/testing files
 scratch.py
 config.py
+.ipynb_checkpoints
 
 # You might also want to ignore other common Python files/folders
 __pycache__/
