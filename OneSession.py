@@ -1474,6 +1474,13 @@ class OneSession:
             else:
                 self._save_data_object(self.trial_df, "trial_df", format)
 
+    def save_bg_behavior_trial_df(self, format='parquet'):
+        if self.bg_behav_by_trial is not None:
+            if format == 'csv':
+                self._save_data_object(self.bg_behav_by_trial, "bg_trial_df", format, index=False)
+            else:
+                self._save_data_object(self.bg_behav_by_trial, "bg_trial_df", format)
+
     def save_expreward_df(self, format='parquet'):
         if self.expreward_df is not None:
             if format == 'csv':
