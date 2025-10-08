@@ -7,6 +7,8 @@ from lifelines.statistics import logrank_test
 from scipy.stats import wilcoxon
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.gridspec as gridspec
+from matplotlib.transforms import ScaledTranslation
 
 
 def boxplot_compare_leavetime(trial_df, ax=None):
@@ -102,7 +104,6 @@ def plot_kaplan_meier(trial_df, ax=None, add_labels=False):
     }
     for phase, settings in groups.items():
         mask = trial_df['phase'] == phase
-        # Use the `add_labels` flag to decide whether to add a legend label
         label = settings['label'] if add_labels else None
         kmf.fit(
             durations=trial_df.loc[mask, 'leave_time'],
@@ -180,8 +181,77 @@ def _global_reward_rate(x, bg_stay, travel_bg2exp, travel_exp2bg, cumulative=8.,
     return rou_g
 
 
+def setup_composite_axes():
+    # --- 1. Define Figure and Grid Parameters ---
+    fig_size = (18, 6)  # (width, height) in inches
+    rows, cols = int(fig_size[1] * 10), int(fig_size[0] * 10)
+
+    # --- 2. Define Relative Ratios for Plots and Fixed Pixels for Margins ---
+    # -- HORIZONTAL (COLUMNS) --
+    # Relative width ratios for the 4 survival plots and 1 boxplot
+    plot_widths_ratio = [10, 10, 10, 10, 8]
+    # Fixed margins in pixels: [between c1-c2, c2-c3, c3-c4, c4-boxplot]
+    margins_x_pixels = [3, 3, 3, 10]
+
+    # -- VERTICAL (ROWS) --
+    # Relative height ratios for the 2 rows of plots
+    plot_heights_ratio = [1, 1]  # Equal height
+    # Fixed margin in pixels between the two rows
+    margins_y_pixels = [8]
+
+    # --- 3. Calculate Plot Sizes based on Remaining Space (Template Logic) ---
+    # Horizontal calculations
+    total_margin_x = np.sum(margins_x_pixels)
+    available_cols = cols - total_margin_x
+    col_sizes = [int(available_cols * ratio / np.sum(plot_widths_ratio)) for ratio in plot_widths_ratio]
+
+    # Vertical calculations
+    total_margin_y = np.sum(margins_y_pixels)
+    available_rows = rows - total_margin_y
+    row_sizes = [int(available_rows * ratio / np.sum(plot_heights_ratio)) for ratio in plot_heights_ratio]
+
+    # --- 4. Interleave Sizes and Margins to get Grid Coordinates ---
+    # This logic now exactly mirrors the template's approach
+    col_coords_raw = [val for pair in zip(col_sizes, margins_x_pixels + [0]) for val in pair][:-1]
+    row_coords_raw = [val for pair in zip(row_sizes, margins_y_pixels + [0]) for val in pair][:-1]
+
+    # Prepend a 0 and take the cumulative sum to get the start/end points for each grid element
+    x_coords = np.insert(np.cumsum(col_coords_raw), 0, 0)
+    y_coords = np.insert(np.cumsum(row_coords_raw), 0, 0)
+
+    # --- 5. Create Figure and Subplots ---
+    fig = plt.figure(figsize=fig_size)
+    gs = gridspec.GridSpec(rows, cols, figure=fig)
+
+    survival_axes = []
+    for r in range(len(plot_heights_ratio)):
+        for c in range(4):  # The first 4 plots are survival plots
+            row_start = y_coords[r * 2]
+            row_end = y_coords[r * 2 + 1]
+            col_start = x_coords[c * 2]
+            col_end = x_coords[c * 2 + 1]
+
+            ax = fig.add_subplot(gs[row_start:row_end, col_start:col_end])
+            survival_axes.append(ax)
+
+            if c > 0:
+                ax.tick_params(labelleft=False)
+
+    # The boxplot spans both rows in the last column
+    boxplot_ax = fig.add_subplot(gs[y_coords[0]:y_coords[-1], x_coords[-2]:x_coords[-1]])
+
+    # --- 6. Add Lettering ---
+    lettering = 'ab'
+    axes_to_letter = [survival_axes[0], boxplot_ax]
+    for i, ax in enumerate(axes_to_letter):
+        ax.text(
+            0.0, 1.0, lettering[i], transform=(
+                    ax.transAxes + ScaledTranslation(-35 / 72, +7 / 72, fig.dpi_scale_trans)),
+            fontsize='large', va='bottom', fontfamily='sans-serif', weight='bold')
+
+    return fig, survival_axes, boxplot_ax
+
 def main():
-    # --- 1. Setup Animals and Figure ---
     animal_info = {
         "SZ036": {'day_0': '2023-11-30', 'sex': 'F'},
         "SZ037": {'day_0': '2023-11-30', 'sex': 'F'},
@@ -194,30 +264,24 @@ def main():
     }
     animal_ids = list(animal_info.keys())
     color_palette = sns.color_palette("Set2")
+    all_animals_df_list = []
 
-    fig, axes = plt.subplots(2, 4, figsize=(16, 6), sharex=True, sharey=True)
-    axes_flat = axes.flatten()  # Flatten the 4x2 array of axes for easy looping
+    fig, survival_axes, boxplot_ax = setup_composite_axes()
 
-    # --- 2. Loop Through Animals and Plot ---
     for i, animal_id in enumerate(animal_ids):
-        ax = axes_flat[i]  # Get the current subplot to draw on
+        ax = survival_axes[i]
         print(f"Processing data for {animal_id}...")
 
-        # Load data for the current animal
         day_0 = animal_info[animal_id]['day_0']
         sex = animal_info[animal_id]['sex']
         master_df = data_loader.load_dataframes_for_animal_summary(
             [animal_id], 'trial_df', day_0=day_0, hemisphere_qc=0, file_format='parquet'
         )
+        all_animals_df_list.append(master_df)
 
-        # --- Plot survival curves ---
-        # `add_labels=(i==0)` means we only add legend labels for the very first plot.
         plot_kaplan_meier(master_df, ax=ax, add_labels=(i == 0))
 
-        # --- Calculate and plot optimal times ---
         optimal_low, optimal_high = calculate_adjusted_optimal(master_df)
-
-        # Add labels only for the first plot to contribute to the shared legend
         if i == 0:
             ax.axvline(x=optimal_high, color=color_palette[1], linestyle='--', label='Optimal in High')
             ax.axvline(x=optimal_low, color=color_palette[0], linestyle='--', label='Optimal in Low')
@@ -225,37 +289,43 @@ def main():
             ax.axvline(x=optimal_high, color=color_palette[1], linestyle='--')
             ax.axvline(x=optimal_low, color=color_palette[0], linestyle='--')
 
-        # --- Perform log-rank test and add p-value text ---
         results_summary = perform_log_rank_test(master_df)
         p_value = results_summary["p"].iloc[0]
         p_text = f'p < 0.001' if p_value < 0.001 else f'p = {p_value:.3f}'
         ax.text(0.95, 0.95, p_text, ha='right', va='top', transform=ax.transAxes)
         ax.set_title(f'{animal_id}, {sex}')
-        ax.get_legend().remove()
 
-    # --- 3. Final Figure Adjustments ---
-    plt.setp(axes, xlim=(0, 25), ylim=(0, 1.05))
-    handles, labels = axes_flat[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper right', fontsize='small', bbox_to_anchor=(0.28, 0.85))
-    fig.supxlabel('Time from Entry (sec)')
-    fig.supylabel('Proportion of Trials Still in Port')
-    fig.tight_layout(rect=[0, 0.03, 1, 0.97])  # rect leaves space for suptitle if needed
+        if ax.get_legend():
+            ax.get_legend().remove()
+    survival_axes[0].set_ylabel("Proportion of Trials Still in Port", y=-0.2)
 
-    # Save the final figure
-    plt.savefig("all_animals_survival_curves.png", dpi=300)
+    master_trial_df = pd.concat(all_animals_df_list, ignore_index=True)
+    boxplot_compare_leavetime(trial_df=master_trial_df, ax=boxplot_ax)
+    boxplot_ax.set_title("All Animals")
+    boxplot_ax.spines['right'].set_visible(False)
+    boxplot_ax.spines['top'].set_visible(False)
+
+    plt.setp(survival_axes, xlim=(0, 25), ylim=(0, 1.05))
+    fig.supxlabel('Time from Entry (sec)', x=0.45)
+    # fig.supylabel('Proportion of Trials Still in Port', x=0.04)
+    handles, labels = survival_axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper right', fontsize='small', bbox_to_anchor=(0.29, 0.83))
+    fig.tight_layout(rect=[0, 0.03, 1, 0.97])
+
+    plt.savefig("all_animals_block_comparison.png", dpi=300)
     plt.show()
 
 
 
 if __name__ == '__main__':
-    # main()
-    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'trial_df',
-                                                                day_0='2023-11-30', hemisphere_qc=0, file_format='parquet')
-
-    animal_ids = ["RK007", "RK008"]
-    master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'trial_df',
-                                                                day_0='2025-06-17', hemisphere_qc=0, file_format='parquet')
-    master_trial_df = pd.concat([master_df1, master_df2], ignore_index=True)
-
-    boxplot_compare_leavetime(trial_df=master_trial_df)
+    main()
+    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'trial_df',
+    #                                                             day_0='2023-11-30', hemisphere_qc=0, file_format='parquet')
+    #
+    # animal_ids = ["RK007", "RK008"]
+    # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'trial_df',
+    #                                                             day_0='2025-06-17', hemisphere_qc=0, file_format='parquet')
+    # master_trial_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    #
+    # boxplot_compare_leavetime(trial_df=master_trial_df)
