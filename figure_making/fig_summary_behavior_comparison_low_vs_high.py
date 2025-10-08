@@ -1,13 +1,89 @@
 import numpy as np
+import pandas as pd
 import data_loader
 import helper
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
+from scipy.stats import wilcoxon
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def plot_kaplan_meier(trial_df, ax, add_labels=False):
+def boxplot_compare_leavetime(trial_df, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+
+    df = trial_df.copy()
+    df['exp_leave_time'] = df['exp_exit'] - df['exp_entry']
+    median_df = df.groupby(['phase', 'animal'])['exp_leave_time'].median().reset_index()
+
+    # box plot and dots
+    palette = {
+        '0.4': sns.color_palette('Set2')[0],
+        '0.8': sns.color_palette('Set2')[1]
+    }
+    sns.boxplot(
+        x='phase',
+        y='exp_leave_time',
+        data=median_df,
+        order=['0.4', '0.8'],
+        palette=palette,
+        ax=ax,
+        width=0.4,
+        showfliers=False,
+        boxprops=dict(alpha=0.7)
+    )
+    offset = 0.25
+    median_df['x_offset'] = median_df['phase'].map({'0.4': 0 + offset,
+                                                    '0.8': 1 - offset})
+    sns.lineplot(
+        x='x_offset',
+        y='exp_leave_time',
+        data=median_df,
+        units='animal',
+        estimator=None,
+        ax=ax,
+        color='gray',
+        alpha=0.6,
+        marker='o',
+        markersize=6
+    )
+    ax.set_ylabel('Median Leave Time (sec)')
+    ax.set_xlabel('Context Reward Rate')
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(['low', 'high'])
+
+    # stats & annotation: Wilcoxon Signed-rank test
+    group1 = median_df.loc[median_df['phase'] == '0.4', 'exp_leave_time'].to_numpy()
+    group2 = median_df.loc[median_df['phase'] == '0.8', 'exp_leave_time'].to_numpy()
+    stat, p_value = wilcoxon(group1, group2)
+    if p_value < 0.001:
+        sig_symbol = '***'
+    elif p_value < 0.01:
+        sig_symbol = '**'
+    elif p_value < 0.05:
+        sig_symbol = '*'
+    else:
+        sig_symbol = 'ns'  # for "not significant"
+    y_max = median_df['exp_leave_time'].max()
+    y_offset = 0.1 * y_max
+    bar_height = y_max + y_offset
+    bar_tips_height = bar_height - (0.02 * y_max)
+    x1, x2 = 0, 1
+    ax.plot([x1, x1, x2, x2], [bar_tips_height, bar_height, bar_height, bar_tips_height], c='dimgray')
+    ax.text((x1 + x2) * 0.5, bar_height, sig_symbol, ha='center', va='bottom', color='black')
+    ax.set_ylim(top=bar_height + y_offset * 0.5)
+
+    if return_handle:
+        plt.tight_layout()
+        fig.show()
+        return fig, ax
+
+def plot_kaplan_meier(trial_df, ax=None, add_labels=False):
     if ax is None:
         fig, ax = plt.subplots(1, 1)
         return_handle = True
@@ -172,4 +248,14 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'trial_df',
+                                                                day_0='2023-11-30', hemisphere_qc=0, file_format='parquet')
+
+    animal_ids = ["RK007", "RK008"]
+    master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'trial_df',
+                                                                day_0='2025-06-17', hemisphere_qc=0, file_format='parquet')
+    master_trial_df = pd.concat([master_df1, master_df2], ignore_index=True)
+
+    boxplot_compare_leavetime(trial_df=master_trial_df)
