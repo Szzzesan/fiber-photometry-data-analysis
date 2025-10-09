@@ -249,6 +249,7 @@ def setup_composite_axes():
                     ax.transAxes + ScaledTranslation(-35 / 72, +7 / 72, fig.dpi_scale_trans)),
             fontsize='large', va='bottom', fontfamily='sans-serif', weight='bold')
 
+    fig.subplots_adjust(left=0.04, right=0.98, top=0.92, bottom=0.08)
     return fig, survival_axes, boxplot_ax
 
 def main():
@@ -309,7 +310,7 @@ def main():
     fig.supxlabel('Time from Entry (sec)', x=0.45)
     # fig.supylabel('Proportion of Trials Still in Port', x=0.04)
     handles, labels = survival_axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper right', fontsize='small', bbox_to_anchor=(0.29, 0.83))
+    fig.legend(handles, labels, loc='upper right', fontsize='small', bbox_to_anchor=(0.22, 0.85))
     fig.tight_layout(rect=[0, 0.03, 1, 0.97])
 
     plt.savefig("all_animals_block_comparison.png", dpi=300)
