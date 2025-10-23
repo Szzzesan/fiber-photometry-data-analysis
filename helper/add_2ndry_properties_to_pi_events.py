@@ -104,10 +104,10 @@ def get_valid_entry_exit(pi_events):
     bg_exits_idx = [bg_exits.groupby('trial').groups[i].max() for i in valid_trials]
     exp_entries_idx = [exp_entries.groupby('trial').groups[i].max() for i in valid_trials]
     exp_exits_idx = [exp_exits.groupby('trial').groups[i].max() for i in valid_trials]
-    bg_entries = bg_entries.time_recording.to_numpy()
-    bg_exits = bg_exits.groupby('trial').time_recording.max().to_numpy()
-    exp_entries = exp_entries.time_recording.to_numpy()
-    exp_exits = exp_exits.time_recording.to_numpy()
+    bg_entries = bg_entries.task_time.to_numpy()
+    bg_exits = bg_exits.groupby('trial').task_time.max().to_numpy()
+    exp_entries = exp_entries.task_time.to_numpy()
+    exp_exits = exp_exits.task_time.to_numpy()
 
     return pi_events, valid_trials, exp_entries, exp_exits, bg_entries, bg_exits
 
@@ -164,17 +164,17 @@ def add_2ndry_properties_to_pi_events(pi_events):
     condition_exiting_exp = (pi_events['key'] == 'head') & (pi_events['value'] == 0) & (pi_events['port'] == 1)
     for i in range(1, pi_events.total_trial+1):
         is_in_trial = pi_events.trial == i
-        time_entering_bg = pi_events.loc[is_in_trial & pi_events.is_valid & condition_entering_bg, 'time_recording']
-        time_exiting_bg = pi_events.loc[is_in_trial & pi_events.is_valid & condition_exiting_bg, 'time_recording']
+        time_entering_bg = pi_events.loc[is_in_trial & pi_events.is_valid & condition_entering_bg, 'task_time']
+        time_exiting_bg = pi_events.loc[is_in_trial & pi_events.is_valid & condition_exiting_bg, 'task_time']
         if (time_entering_bg.size > 0) & (time_exiting_bg.size > 0):
             idx_list_bg = range(time_entering_bg.index[0], time_exiting_bg.index[0]+1)
-            time_in_bg = [pi_events.loc[idx, 'time_recording'] - time_entering_bg.values[0] for idx in idx_list_bg]
+            time_in_bg = [pi_events.loc[idx, 'task_time'] - time_entering_bg.values[0] for idx in idx_list_bg]
             pi_events.loc[idx_list_bg, 'time_in_port'] = time_in_bg
-        time_entering_exp = pi_events.loc[is_in_trial & pi_events.is_valid & condition_entering_exp, 'time_recording']
-        time_exiting_exp = pi_events.loc[is_in_trial & pi_events.is_valid & condition_exiting_exp, 'time_recording']
+        time_entering_exp = pi_events.loc[is_in_trial & pi_events.is_valid & condition_entering_exp, 'task_time']
+        time_exiting_exp = pi_events.loc[is_in_trial & pi_events.is_valid & condition_exiting_exp, 'task_time']
         if (time_entering_exp.size > 0) & (time_exiting_exp.size > 0):
             idx_list_exp = range(time_entering_exp.index[0], time_exiting_exp.index[0]+1)
-            time_in_exp = [pi_events.loc[idx, 'time_recording'] - time_entering_exp.values[0] for idx in idx_list_exp]
+            time_in_exp = [pi_events.loc[idx, 'task_time'] - time_entering_exp.values[0] for idx in idx_list_exp]
             pi_events.loc[idx_list_exp, 'time_in_port'] = time_in_exp
     # endregion
     return pi_events
