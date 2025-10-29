@@ -22,7 +22,7 @@ def process_animal_data_and_save(animal_str):
             print(f"Processing session: {name} ...")
             session_dir = os.path.join(raw_dir, name)
             pi_events, session_identifier = process_behavior_data(session_dir)
-            filename_base = f"{animal_str}_{session_identifier}_pi_events_proccessed"
+            filename_base = f"{animal_str}_{session_identifier}_pi_events_processed"
             file_path = os.path.join(save_dir, f"{filename_base}.parquet")
             pi_events.to_parquet(file_path)
             print(f"Successfully processed and saved: {file_path}")
