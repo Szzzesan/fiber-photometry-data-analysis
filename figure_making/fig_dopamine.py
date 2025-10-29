@@ -839,6 +839,39 @@ def _set_axes_for_box_and_swarm(axes):
     # )
 
 
+def fige_DA_vs_NRI_v1(master_df, axes=None):
+    data = master_df[(master_df['IRI'] > 1)]
+    if axes is None:
+        fig, axes = plt.subplots(1, 1)
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+
+    ax = axes
+    subset = data.copy()
+    ## plot mean and sem curves
+    df_plot = get_mean_sem_DA_for_feature(subset, var='NRI', sample_per_bin=500)
+    x = df_plot['bin_center']
+    y = df_plot['mean']
+    y_err = df_plot['sem']
+    line = ax.plot(x, y, linewidth=1.5, alpha=0.8)
+    ax.fill_between(x, y - y_err, y + y_err, color=line[0].get_color(), alpha=0.5)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.set_xlim([-0.1, 11])
+    ax.set_yticks([2, 2.5, 3, 3.5, 4, 4.5])
+    ax.set_ylim([1.85, 3.85])
+    ax.set_xlabel('Reward Time from Entry (s)')
+    ax.set_ylabel('Peak Amplitude')
+        # ax.set_title('DA vs. NRI')
+
+    if return_handle:
+        fig.show()
+        return fig, axes
+
 def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
     if axes is None:
         fig, axes = plt.subplots(1, 1, figsize=(10, 4))
@@ -1678,7 +1711,8 @@ if __name__ == '__main__':
     master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
                                                                 day_0='2025-06-17', file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
-    figf_DA_vs_NRI_block_split_v1(master_DA_features_df, axes=None)
+    fige_DA_vs_NRI_v1(master_DA_features_df, axes=None)
+    # figf_DA_vs_NRI_block_split_v1(master_DA_features_df, axes=None)
     # figf_summary_block_split(master_DA_features_df, axes=None)
     # figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
     # figef_DA_vs_NRI(master_DA_features_df)
