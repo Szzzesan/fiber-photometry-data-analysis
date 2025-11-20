@@ -5,7 +5,7 @@ scratch.py
 config.py
 .ipynb_checkpoints
 
-# You might also want to ignore other common Python files/folders
+# Ignore other common Python files/folders
 __pycache__/
 *.pyc
 .idea/
