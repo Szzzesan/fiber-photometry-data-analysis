@@ -1682,15 +1682,16 @@ if __name__ == '__main__':
     # main()
 
     # # --- Plot example trial 1d ---
-    # animal_str = 'SZ036'
-    # session_name = '2024-01-08T13_52'
-    # zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
-    #                                                           session_long_name=session_name,
-    #                                                           file_format='parquet')
-    # trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
-    #                                               file_format='parquet')
+    animal_str = 'SZ037'
+    session_name = '2024-01-10T13_01'
+    zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
+                                                              session_long_name=session_name,
+                                                              file_format='parquet')
+    trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
+                                                  file_format='parquet')
+    figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=15, ax=None)
     # for trial in trial_df['trial'].unique():
-    #     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=trial, ax=None)
+    #     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=15, ax=None)
     #
     # # --- Plot example sessions heatmap and average traces ---
     # animal_str = 'SZ036'
@@ -1703,15 +1704,15 @@ if __name__ == '__main__':
     # figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=None)
 
     ## --- Plot DA vs. NRI for all data ---
-    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                day_0='2023-11-30', file_format='parquet')
-
-    animal_ids = ["RK007", "RK008"]
-    master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                day_0='2025-06-17', file_format='parquet')
-    master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
-    fige_DA_vs_NRI_v1(master_DA_features_df, axes=None)
+    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                             day_0='2023-11-30', file_format='parquet')
+    #
+    # animal_ids = ["RK007", "RK008"]
+    # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                             day_0='2025-06-17', file_format='parquet')
+    # master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    # fige_DA_vs_NRI_v1(master_DA_features_df, axes=None)
     # figf_DA_vs_NRI_block_split_v1(master_DA_features_df, axes=None)
     # figf_summary_block_split(master_DA_features_df, axes=None)
     # figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
