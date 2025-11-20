@@ -469,8 +469,10 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
             # ani_summary.session_obj_list[i].save_expreward_df(format='parquet')
             # DA_block_transition_list[i] = ani_summary.session_obj_list[i].bg_port_in_block_reversal(plot_single_traes=0,
             #                                                                                         plot_average=0)
-            ani_summary.session_obj_list[i].extract_bg_behav_by_trial()
-            ani_summary.session_obj_list[i].save_bg_behavior_trial_df(format='parquet')
+            ani_summary.session_obj_list[i].extract_nonreward_DA_vs_time(exclusion_start_relative=0, exclusion_end_relative=2)
+            ani_summary.session_obj_list[i].visualize_nonreward_DA(bin_size=1)
+            # ani_summary.session_obj_list[i].extract_bg_behav_by_trial()
+            # ani_summary.session_obj_list[i].save_bg_behavior_trial_df(format='parquet')
             # lick_rates, (lick_mod_low[i], lick_mod_high[i]) = ani_summary.session_obj_list[i].calculate_lick_rates_around_bg_reward()
             # ani_summary.session_obj_list[i].plot_bg_heatmaps(save=1)
             # ani_summary.session_obj_list[i].plot_heatmaps(save=1)
