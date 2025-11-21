@@ -147,6 +147,10 @@ class OneSession:
              'excess_exp_entries': excess_exp_entries
              })
 
+    def add_trial_info_to_recording(self):
+        self.dFF0 = helper.match_recording_time_to_trial_time(self.dFF0, self.trial_df)
+        self.zscore = helper.match_recording_time_to_trial_time(self.zscore, self.trial_df)
+
     def construct_expreward_interval_df(self):
         [head, trial, cue, reward, lick, off, on, port1, port2, valid_head] = helper.get_bools(self.pi_events)
         valid_trial = self.pi_events['is_valid_trial']
@@ -1625,6 +1629,7 @@ if __name__ == '__main__':
     # test_session.save_pi_events(format='parquet')
     test_session.construct_trial_df()
     # test_session.save_trial_df(format='parquet')
+    test_session.add_trial_info_to_recording()
     test_session.construct_expreward_interval_df()
     test_session.extract_nonreward_DA_vs_time(exclusion_start_relative=0, exclusion_end_relative=2)
     test_session.visualize_nonreward_DA(bin_size=1)
