@@ -33,7 +33,7 @@ def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False'
     fps = 40
     F_0_framewindow = F_0_timewindow * fps
     dFF0 = pd.DataFrame(
-        columns=['time_recording', fitted.columns.values[1][:-4], fitted.columns.values[3][:-4]])
+        columns=['time_recording', fitted.columns.values[1][:-4], fitted.columns.values[3][:-4], 'F_0'])
     dFF0.iloc[:, 0] = fitted.iloc[:, 0]
     for i in range(num_color_site):
         F_0 = fitted.iloc[:, 2 * i + 1].rolling(window=F_0_framewindow, center=True).mean()
@@ -44,7 +44,7 @@ def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False'
         # F_0 = pd.Series(subtracted_padded).rolling(window=F_0_framewindow, center=True).mean().iloc[pad_width:-pad_width].reset_index(drop=True)
         # dFF0.iloc[:, i + 1] = (fitted.iloc[:, 2 * i + 1] - F_0) / F_0
     # endregion
-
+    dFF0['F_0'] = F_0
     dFF0.iloc[:, 0] = dFF0.iloc[:, 0].div(1000)
 
     if plot:
