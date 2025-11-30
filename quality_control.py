@@ -34,3 +34,16 @@ qc_selections = {
         'right'
     }
 }
+
+exp_which_side = {
+    'SZ036': 'right',
+    'SZ037': 'right',
+    'SZ038': 'right',
+    'SZ039': 'right',
+    'SZ042': 'right',
+    'SZ043': 'right',
+    'RK007': 'left', # port swapped
+    'RK008': 'right',
+    'RK009': 'left', # port swapped
+    'RK010': 'right'
+}

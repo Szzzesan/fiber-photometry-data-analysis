@@ -118,7 +118,8 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, hemisphere_qc
             animal_session_info.append({'path': file, 'id': session_id, 'datetime': session_dt})
 
         daily_session_counter = defaultdict(int)
-        animal_rules = qc.qc_selections[animal]
+        animal_branch_inclusion_rules = qc.qc_selections[animal]
+        animal_port_assignment = qc.exp_which_side[animal]
         for session_data in animal_session_info:
             session_dt = session_data['datetime']
             session_date_only = session_dt.date()
@@ -136,7 +137,7 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, hemisphere_qc
 
             if hemisphere_qc:
                 masks_to_keep = []
-                for hemi in animal_rules:
+                for hemi in animal_branch_inclusion_rules:
                     if 'hemisphere' in df.columns:
                         masks_to_keep.append(df['hemisphere'] == hemi)
                     elif 'branch' in df.columns:
@@ -150,6 +151,22 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, hemisphere_qc
 
 
             if not df.empty:
+                if 'hemisphere' in df.columns:
+                    df['side_relative'] = np.where(
+                        df['hemisphere'] == animal_port_assignment,
+                        'ipsi',
+                        'contra'
+                    )
+                elif 'branch' in df.columns:
+                    target_branch_val = f"green_{animal_port_assignment}"
+                    df['side_relative'] = np.where(
+                        df['branch'] == target_branch_val,
+                        'ipsi',
+                        'contra'
+                    )
+                else:
+                    df['side_relative'] = np.nan
+
                 df['animal'] = animal
                 df['session'] = session_data['id']
                 df['day_relative'] = day_relative
