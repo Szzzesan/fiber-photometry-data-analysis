@@ -70,6 +70,7 @@ class OneSession:
         self.DA_vs_NRI_IRI = pd.DataFrame()
         self.bg_behav_by_trial = pd.DataFrame()
         self.nonreward_DA_vs_time = pd.DataFrame()
+        self.nonreward1stmoment_DA_vs_time = pd.DataFrame()
 
     # --- Data Loading and Initial Processing ---
     def examine_raw(self, save=0):
@@ -1391,81 +1392,58 @@ class OneSession:
             drop=True)
         self.nonreward_DA_vs_time = nonreward_DA_vs_time
 
-    def visualize_nonreward_DA(self, bin_size=0.5):
-        max_time = self.nonreward_DA_vs_time['time_in_port'].max()
-        bins = np.arange(0, max_time + bin_size, bin_size)
-        self.nonreward_DA_vs_time['time_bin'] = pd.cut(self.nonreward_DA_vs_time['time_in_port'], bins=bins,
-                                                       include_lowest=True)
+    def extract_firstmoment_nonreward_DA_vs_time(self):
+        first_rewards = self.expreward_df.groupby('trial').first()
+        entry_times = first_rewards['entry_time'].to_numpy()
+        reward_times = first_rewards['reward_time'].to_numpy()
+        zscore_times = self.zscore['time_recording'].to_numpy()
+        keep_mask = np.full(zscore_times.shape, False)
+        inclusion_start = entry_times
+        inclusion_end = reward_times
+        for (start, end) in zip(inclusion_start, inclusion_end):
+            is_within_1stmoment = (zscore_times >= start) & (zscore_times < end)
+            keep_mask[is_within_1stmoment] = True
+        nonreward1stmoment_DA_vs_time = self.zscore[keep_mask].reset_index(drop=True)
+        nonreward1stmoment_DA_vs_time.dropna(inplace=True, how='any')
+        nonreward1stmoment_DA_vs_time.reset_index(drop=True)
+        port_entry = self.trial_df['exp_entry'].to_numpy()
+        port_exit = self.trial_df['exp_exit'].to_numpy()
+        trial_numbers = self.trial_df['trial'].to_numpy()  # Get trial IDs for assignment
+        block = self.trial_df['phase'].to_numpy()
+        nonreward_times = nonreward1stmoment_DA_vs_time['time_recording'].to_numpy()
 
-        def sem(series):
-            return series.std() / np.sqrt(len(series))
+        nonreward1stmoment_DA_vs_time['phase'] = np.nan
+        nonreward1stmoment_DA_vs_time['trial'] = np.nan
+        nonreward1stmoment_DA_vs_time['time_in_port'] = np.nan
 
-        binned_results_all = self.nonreward_DA_vs_time.groupby('time_bin')[['green_right', 'green_left']].agg(
-            ['mean', ('sem', sem)]).reset_index()
-        binned_results_all['bin_center'] = np.arange(bin_size / 2, max_time + bin_size / 2, bin_size)
-
-        binned_results_split = self.nonreward_DA_vs_time.groupby(['time_bin', 'phase'])[
-            ['green_right', 'green_left']].agg(
-            ['mean', ('sem', sem)]).reset_index()
-        binned_results_split['bin_center'] = np.repeat(np.arange(bin_size / 2, max_time + bin_size / 2, bin_size), 2)
-
-        phases = ['0.4', '0.8']
-        color_map = {
-            '0.4': sns.color_palette('Set2')[0],  # Blue/Green
-            '0.8': sns.color_palette('Set2')[1]  # Orange/Yellow
-        }
-        label_map = {
-            '0.4': 'low',  # Blue/Green
-            '0.8': 'high'  # Orange/Yellow
-        }
-        errorbar_params = {
-            'fmt': 'o',
-            'ms': 3,
-            'capsize': 5,
-            'elinewidth': 1.5,
-            'linestyle': '--'
-        }
-
-        for branch in ['green_left', 'green_right']:
-            fig, axes = plt.subplots(2, 1, sharex=True)
-            y_mean_all = binned_results_all[(branch, 'mean')]
-            y_sem_all = binned_results_all[(branch, 'sem')]
-            axes[0].errorbar(
-                x=binned_results_all['bin_center'],
-                y=y_mean_all,
-                yerr=y_sem_all,
-                color='darkblue',
-                ecolor='gray',
-                **errorbar_params
-            )
-            axes[0].set_ylabel('Mean DA (z-score)')
-
-            for phase_val in phases:
-                group_data = binned_results_split.loc[binned_results_split['phase'] == phase_val]
-                current_color = color_map[phase_val]
-                label = label_map[phase_val]
-                y_mean_split = group_data[(branch, 'mean')]
-                y_sem_split = group_data[(branch, 'sem')]
-
-                axes[1].errorbar(
-                    x=group_data['bin_center'],
-                    y=y_mean_split,
-                    yerr=y_sem_split,
-                    color=current_color,
-                    ecolor=current_color,
-                    label=label,
-                    **errorbar_params
+        # Map time points to trials and calculating relative time ---
+        for i in range(len(port_entry)):
+            entry_time = port_entry[i]
+            exit_time = port_exit[i]
+            trial_id = trial_numbers[i]
+            block_i = block[i]
+            is_in_current_trial = (nonreward_times >= entry_time) & (nonreward_times < exit_time)
+            indices_to_update = nonreward1stmoment_DA_vs_time.loc[is_in_current_trial].index
+            if not indices_to_update.empty:
+                nonreward1stmoment_DA_vs_time.loc[indices_to_update, 'phase'] = block_i
+                nonreward1stmoment_DA_vs_time.loc[indices_to_update, 'trial'] = trial_id
+                time_relative_to_entry = (
+                        nonreward1stmoment_DA_vs_time.loc[indices_to_update, 'time_recording'] - entry_time
                 )
+                nonreward1stmoment_DA_vs_time.loc[indices_to_update, 'time_in_port'] = time_relative_to_entry
 
-            axes[1].set_ylabel('Mean DA (z-score)')
-            axes[1].set_xlabel('Time Bin from Entry (sec)')
-            axes[1].legend()
-            for ax in axes.flat:
-                ax.set_ylim([-1.5, 1.5])
-                ax.grid(axis='y', linestyle=':', alpha=0.6)
-            plt.suptitle(f'{self.animal} {self.signal_dir[-23:-7]} {branch[6:]}: non-reward DA', y=0.95)
-            plt.tight_layout()
-            plt.show()
+        nonreward1stmoment_DA_vs_time = nonreward1stmoment_DA_vs_time.dropna(
+            subset=['phase', 'trial', 'time_in_port']).reset_index(
+            drop=True)
+        self.nonreward1stmoment_DA_vs_time = nonreward1stmoment_DA_vs_time
+
+    def visualize_nonreward_DA(self, plot_1st_moment=True, plot_all=True, bin_size=0.5):
+        if plot_1st_moment:
+            title = f'{self.animal} {self.signal_dir[-23:-7]}: 1st moment non-reward DA'
+            helper.visualize_nonreward_DA(self.nonreward1stmoment_DA_vs_time, fig_title=title, bin_size=bin_size/3)
+        if plot_all:
+            title = f'{self.animal} {self.signal_dir[-23:-7]}: non-reward DA'
+            helper.visualize_nonreward_DA(self.nonreward_DA_vs_time, fig_title=title, bin_size=bin_size)
 
     def extract_binned_da_vs_reward_history_matrix(self, binsize=0.1, save=0):
         condition_exp_entry = (self.pi_events['key'] == 'head') & (self.pi_events['value'] == 1) & (
@@ -1618,6 +1596,13 @@ class OneSession:
             else:
                 self._save_data_object(self.DA_vs_NRI_IRI, "DA_vs_features", format)
 
+    def save_nonreward_1stmoment_DA(self, format='parquet'):
+        if self.nonreward1stmoment_DA_vs_time is not None:
+            if format == 'csv':
+                self._save_data_object(self.nonreward1stmoment_DA_vs_time, "nonreward_1st", format, index=False)
+            else:
+                self._save_data_object(self.nonreward1stmoment_DA_vs_time, "nonreward_1st", format)
+
 
 if __name__ == '__main__':
     test_session = OneSession('SZ036', 15, include_branch='both', port_swap=0)
@@ -1631,6 +1616,7 @@ if __name__ == '__main__':
     # test_session.save_trial_df(format='parquet')
     test_session.add_trial_info_to_recording()
     test_session.construct_expreward_interval_df()
+    test_session.extract_firstmoment_nonreward_DA_vs_time()
     test_session.extract_nonreward_DA_vs_time(exclusion_start_relative=0, exclusion_end_relative=2)
     test_session.visualize_nonreward_DA(bin_size=1)
     test_session.save_expreward_df(format='parquet')
