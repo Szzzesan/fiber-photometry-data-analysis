@@ -51,7 +51,7 @@ def match_recording_time_to_trial_time(time_recording_df, trial_df):
 
 
 if __name__ == '__main__':
-    animal_str = 'SZ036'
+    animal_str = 'SZ037'
     dFF0 = load_session_dataframe(animal_str, 'dFF0', session_id=15, file_format='parquet')
     trial_df = load_session_dataframe(animal_str, 'trial_df', session_id=15, file_format='parquet')
     dFF0_matched = match_recording_time_to_trial_time(dFF0, trial_df)
