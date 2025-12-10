@@ -74,7 +74,7 @@ def load_session_dataframe(animal_id, df_name, session_id=None, session_long_nam
         return None
 
 
-def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, hemisphere_qc=1, file_format='parquet'):
+def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, melt=False, hemisphere_qc=1, file_format='parquet'):
     """
     Loads and concatenates data files for a list of animals.
 
@@ -134,6 +134,18 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, hemisphere_qc
             else:
                 print(f"Unsupported file format: {file_format}")
                 continue
+
+            if melt:
+                signals = ['green_right', 'green_left']
+                ids = [col for col in df.columns if col not in signals]
+                df = pd.melt(
+                    df,
+                    id_vars=ids,
+                    value_vars=['green_right', 'green_left'],
+                    var_name='hemisphere',
+                    value_name='DA'
+                )
+                df['hemisphere'] = df['hemisphere'].str.replace('green_', '')
 
             if hemisphere_qc:
                 masks_to_keep = []
