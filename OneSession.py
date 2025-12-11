@@ -1603,6 +1603,13 @@ class OneSession:
             else:
                 self._save_data_object(self.nonreward1stmoment_DA_vs_time, "nonreward_1st", format)
 
+    def save_nonreward_DA(self, format='parquet'):
+        if self.nonreward_DA_vs_time is not None:
+            if format == 'csv':
+                self._save_data_object(self.nonreward_DA_vs_time, "nonreward_DA", format, index=False)
+            else:
+                self._save_data_object(self.nonreward_DA_vs_time, "nonreward_DA", format)
+
 
 if __name__ == '__main__':
     test_session = OneSession('SZ036', 15, include_branch='both', port_swap=0)
