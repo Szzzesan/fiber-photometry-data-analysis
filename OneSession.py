@@ -68,6 +68,7 @@ class OneSession:
         self.reward_features_DA = pd.DataFrame()
         self.DA_NRI_block_priorrewards = pd.DataFrame()
         self.DA_vs_NRI_IRI = pd.DataFrame()
+        self.last_reward_df = pd.DataFrame()
         self.bg_behav_by_trial = pd.DataFrame()
         self.nonreward_DA_vs_time = pd.DataFrame()
         self.nonreward1stmoment_DA_vs_time = pd.DataFrame()
@@ -817,11 +818,6 @@ class OneSession:
                                                           task=self.task)
 
     def extract_reward_features_and_DA(self, plot=0, save_dataframe=0):
-        # df_iri_exp = helper.extract_intervals_expreward(
-        #     self.pi_events,
-        #     ani_str=self.animal,
-        #     ses_str=self.signal_dir[-21:-7]
-        # )
         df_iri_exp = self.expreward_df
         reward_times = df_iri_exp['reward_time'].to_numpy()
         peak_amps = {}
@@ -1295,9 +1291,6 @@ class OneSession:
         return DA_in_block_transition
 
     def visualize_DA_vs_NRI_IRI(self, plot_histograms=0, plot_scatters=0, save=0):
-        # df_IRI_exp = helper.extract_intervals_expreward(self.pi_events, plot_histograms=plot_histograms,
-        #                                                 ani_str=self.animal,
-        #                                                 ses_str=self.signal_dir[-21:-7])
         df_IRI_exp = self.expreward_df
         df = df_IRI_exp
         df = df[df['IRI_post'] > 0.6].reset_index(drop=True)
@@ -1346,6 +1339,37 @@ class OneSession:
         # df_long = df_long[['animal', 'hemisphere', 'session', 'NRI', 'IRI', 'DA']]
         df_long = df_long[['hemisphere', 'NRI', 'IRI', 'block', 'DA']]
         self.DA_vs_NRI_IRI = df_long.dropna().reset_index(drop=True)
+
+    def extract_lastreward_DA(self):
+        df = self.expreward_df.copy()
+        last_reward_df = df.groupby(['trial', 'block']).tail(1)
+        arr_RXI = last_reward_df['exit_time'].to_numpy() - last_reward_df['reward_time'].to_numpy()
+        last_reward_df = last_reward_df[arr_RXI > 0.6].reset_index(drop=True)
+        arr_RXI = arr_RXI[arr_RXI > 0.6]
+        last_reward_df['RXI'] = arr_RXI
+        for branch in ['green_right', 'green_left']:
+            if branch not in self.dFF0.columns:
+                continue  # Skip if branch is missing
+            arr_DA_amp = np.zeros(arr_RXI.shape[0])
+            arr_DA_amp.fill(np.nan)
+            for row_reward in range(last_reward_df.shape[0]):
+                start = last_reward_df.loc[row_reward, 'reward_time']
+                end = last_reward_df.loc[row_reward, 'exit_time']
+                condition_in_range = (self.zscore['time_recording'] >= start) & (self.zscore['time_recording'] < end)
+                is_amp_calculation_range = condition_in_range & (self.zscore['time_recording'] < start + 0.5)
+                soi_for_amp = self.zscore.loc[is_amp_calculation_range, branch].to_numpy()
+                if np.count_nonzero(~np.isnan(soi_for_amp)) > 1:
+                    arr_DA_amp[row_reward] = np.max(soi_for_amp) - np.min(soi_for_amp)
+            last_reward_df[f'DA_{branch[6:]}'] = arr_DA_amp
+
+        value_vars = ['DA_right', 'DA_left']
+        id_vars = [col for col in last_reward_df.columns if col not in value_vars]
+        last_reward_df = last_reward_df.melt(id_vars=id_vars,
+                               value_vars=value_vars,
+                               var_name='hemisphere',
+                               value_name='DA')
+        last_reward_df['hemisphere'] = last_reward_df['hemisphere'].str.replace('DA_', '')
+        self.last_reward_df = last_reward_df
 
     def extract_nonreward_DA_vs_time(self, exclusion_start_relative, exclusion_end_relative):
         # df_IRI_exp = helper.extract_intervals_expreward(self.pi_events, plot_histograms=0,
@@ -1596,6 +1620,10 @@ class OneSession:
             else:
                 self._save_data_object(self.DA_vs_NRI_IRI, "DA_vs_features", format)
 
+    def save_lastreward_df(self, format='parquet'):
+        if self.last_reward_df is not None:
+            self._save_data_object(self.last_reward_df, "DA_vs_lastR_df", format)
+
     def save_nonreward_1stmoment_DA(self, format='parquet'):
         if self.nonreward1stmoment_DA_vs_time is not None:
             if format == 'csv':
@@ -1623,10 +1651,11 @@ if __name__ == '__main__':
     # test_session.save_trial_df(format='parquet')
     test_session.add_trial_info_to_recording()
     test_session.construct_expreward_interval_df()
+    test_session.extract_lastreward_DA()
     test_session.extract_firstmoment_nonreward_DA_vs_time()
     test_session.extract_nonreward_DA_vs_time(exclusion_start_relative=0, exclusion_end_relative=2)
-    test_session.visualize_nonreward_DA(bin_size=1)
-    test_session.save_expreward_df(format='parquet')
+    # test_session.visualize_nonreward_DA(bin_size=1)
+    # test_session.save_expreward_df(format='parquet')
     # test_session.extract_bg_behav_by_trial()
     # test_session.plot_reward_aligned_lick_histograms()
     # test_session.calculate_lick_rates_around_bg_reward(reward_idx_to_align=2, plot_comparison=1)
