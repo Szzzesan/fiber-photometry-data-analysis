@@ -44,9 +44,9 @@ def match_recording_time_to_trial_time(time_recording_df, trial_df):
                     time_recording_df.loc[bg_indices_to_update, 'time_recording'] - bg_entry_time
             )
             time_recording_df.loc[bg_indices_to_update, 'time_in_port'] = bg_time_relative_to_entry
-    #
-    # time_recording_df = time_recording_df.dropna(subset=['phase', 'trial', 'time_in_port']).reset_index(
-    #     drop=True)
+
+    time_recording_df['trial'] = time_recording_df['trial'].ffill()
+    time_recording_df['phase'] = time_recording_df['phase'].ffill()
     return time_recording_df
 
 
