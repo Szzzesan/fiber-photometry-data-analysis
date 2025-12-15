@@ -4,21 +4,6 @@ import seaborn as sns
 from figure_making import data_loader
 
 
-def preprocess_data(df):
-    df = df.copy()
-
-    # 1. Sort by time to ensure the sequence is correct
-    df = df.sort_values('time_recording')
-
-    # 2. Forward Fill Trial and Phase
-    # This takes the value from 'exp' (or 'bg') and carries it forward
-    # into the NaN rows (the traveling periods) immediately following them.
-    df['trial'] = df['trial'].ffill()
-    df['phase'] = df['phase'].ffill()
-
-    return df
-
-
 def draw_break_marks(ax1, d=0.05, x_gap=0.1, y_top=0.9, y_gap=0.05):
     """
     Draws diagonal lines (break marks) with precise control over position.
@@ -365,7 +350,6 @@ if __name__ == '__main__':
     session_id = 5
     # session_long_name = '2024-01-11T16_25'
     df = data_loader.load_session_dataframe(animal_str, 'zscore', session_id=session_id, file_format='parquet')
-    df = preprocess_data(df)
     print("Generating Plot 1: BG -> Exp Sequence")
     create_broken_axis_plots(df, alignment_mode='bg_to_exp')
     # create_aligned_plots(df, alignment_mode='bg_to_exp')
