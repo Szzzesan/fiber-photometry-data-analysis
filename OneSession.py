@@ -93,6 +93,8 @@ class OneSession:
         self.zscore = pd.DataFrame({'time_recording': self.dFF0.time_recording})
         self.zscore['green_right'] = stats.zscore(self.dFF0['green_right'].tolist(), nan_policy='omit')
         self.zscore['green_left'] = stats.zscore(self.dFF0['green_left'].to_list(), nan_policy='omit')
+        self.zscore['F0_right_zscore'] = stats.zscore(self.dFF0['F0_right'].tolist(), nan_policy='omit')
+        self.zscore['F0_left_zscore'] = stats.zscore(self.dFF0['F0_left'].tolist(), nan_policy='omit')
 
     def remove_outliers_dFF0(self):
         col_name_obj = self.dFF0.columns
