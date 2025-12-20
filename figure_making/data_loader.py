@@ -136,16 +136,24 @@ def load_dataframes_for_animal_summary(animal_ids, df_name, day_0, melt=False, h
                 continue
 
             if melt:
-                signals = ['green_right', 'green_left']
-                ids = [col for col in df.columns if col not in signals]
-                df = pd.melt(
-                    df,
-                    id_vars=ids,
-                    value_vars=['green_right', 'green_left'],
-                    var_name='hemisphere',
-                    value_name='DA'
-                )
-                df['hemisphere'] = df['hemisphere'].str.replace('green_', '')
+                target_cols = ['green_right', 'green_left', 'F0_right', 'F0_left']
+                ids = [col for col in df.columns if col not in target_cols]
+                df_reshaped = df.set_index(ids)
+                df_reshaped.columns = df_reshaped.columns.str.split('_', expand=True)
+                df_reshaped = df_reshaped.stack(level=1)
+                df_final = df_reshaped.reset_index()
+
+                # Rename the new hemisphere column (created by stack)
+                # It is usually named 'level_{len(ids)}' or similar by default, so we rename based on position or generic name
+                # The stack operation likely put 'hemisphere' as the last index level.
+                df_final = df_final.rename(columns={'level_{}'.format(len(ids)): 'hemisphere', 'green': 'DA'})
+
+                # Optional: If the rename above didn't catch the hemisphere column name (common in older pandas):
+                # You can check df_final.columns. usually the column created by stack doesn't have a name
+                # until you assign it, or it takes the name of the column level.
+                # A safer, explicit rename for the last column before data columns:
+                df_final.columns.name = None  # Remove index hierarchy names
+                df = df_final
 
             if hemisphere_qc:
                 masks_to_keep = []
