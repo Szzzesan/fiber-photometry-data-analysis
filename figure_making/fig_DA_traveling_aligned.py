@@ -174,7 +174,7 @@ def create_broken_axis_plots(df):
 
             # Handle Y-Axis Labels (Only on far left)
             if col_idx == 0:
-                ax.set_ylabel(f"{animal} {hemi}\nDA (Z-Score)")
+                ax.set_ylabel(f"DA (Z-Score)")
                 ax.tick_params(axis='y', left=True, labelleft=True)
                 ax.legend(loc='upper left', frameon=False, fontsize=9)
             else:
@@ -219,6 +219,7 @@ def create_broken_axis_plots(df):
                         ha='center', va='bottom', fontsize=9, fontweight='bold')
 
         plt.suptitle(f"{animal} - {hemi}", y=0.98)
+
         plt.tight_layout()
         plt.show()
 
