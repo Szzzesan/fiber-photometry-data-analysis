@@ -24,8 +24,6 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
 import matplotlib.ticker as mticker
 
-# import cmasher
-
 mpl.rcParams['figure.dpi'] = 300
 
 
@@ -1246,32 +1244,32 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     # Check the model summary output to ensure these names are correct.
     name_map = {
         'C(block, Treatment(\'0.8\'))[T.0.4]': 'context (low vs. high)',
-        'logNRI_std': 'NRI',
+        'logNRI_std': 'time',
         'logIRI_std': 'IRI',
         'C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'side',
-        'logNRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'NRI * side',
-        'logNRI_std:logIRI_std': 'NRI * IRI',
-        'logNRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'NRI * context',
+        'logNRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'time * side',
+        'logNRI_std:logIRI_std': 'time * IRI',
+        'logNRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'time * context',
         'logIRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'IRI * context',
         'logIRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'IRI * side',
         'C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'context * side',
-        'logNRI_std:logIRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'NRI * IRI * context',
+        'logNRI_std:logIRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'time * IRI * context',
         'logIRI_std:C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'IRI * context * side',
-        'logNRI_std:logIRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'NRI * IRI * side',
-        'logNRI_std:C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'NRI * context * side'
+        'logNRI_std:logIRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'time * IRI * side',
+        'logNRI_std:C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'time * context * side'
     }
 
     conf_to_plot_renamed = conf_to_plot.rename(index=name_map)
 
     desired_order = [
-        'NRI',
+        'time',
         'context (low vs. high)',
         'IRI',
-        'NRI * side',
+        'time * side',
         'context * side',
         'IRI * side',
-        'NRI * IRI',
-        'NRI * IRI * side'
+        'time * IRI',
+        'time * IRI * side'
     ]
     # Filter for any names in desired_order that actually exist in the renamed index
     final_order = [name for name in desired_order if name in conf_to_plot_renamed.index]
@@ -1508,8 +1506,8 @@ def setup_axes_v2():
         # DA vs. NRI but split by blocks from all animals
         fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_3_splits[-2]:row_3_splits[-1]]),
         # block comparison collapsed across all delays
-        fig.add_subplot(gs[col_2_splits[5]:col_2_splits[6],
-                        row_2_splits[-2]:int((row_2_splits[-1] - row_2_splits[-2]) / 2 + row_2_splits[-2])]),
+        fig.add_subplot(gs[col_2_splits[5]:col_2_splits[6], row_2_splits[-2]:row_2_splits[-1]])
+                        # row_2_splits[-2]:int((row_2_splits[-1] - row_2_splits[-2]) / 2 + row_2_splits[-2])]),
         # coefficient plot
 
     ]
@@ -1702,7 +1700,7 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
+    main()
 
     # # --- Plot example trial 1d ---
     # animal_str = 'SZ037'
@@ -1727,18 +1725,18 @@ if __name__ == '__main__':
     # figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=None)
 
     ## --- Plot DA vs. NRI for all data ---
-    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                day_0='2023-11-30', file_format='parquet')
-
-    animal_ids = ["RK007", "RK008"]
-    master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                day_0='2025-06-17', file_format='parquet')
-    master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
-    # fige_DA_vs_NRI_v1(master_DA_features_df, axes=None)
-    # figf_DA_vs_NRI_block_split_v1(master_DA_features_df, axes=None)
-    # figf_summary_block_split(master_DA_features_df, axes=None)
-    figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
+    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                             day_0='2023-11-30', file_format='parquet')
+    #
+    # animal_ids = ["RK007", "RK008"]
+    # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+    #                                                             day_0='2025-06-17', file_format='parquet')
+    # master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    # # fige_DA_vs_NRI_v1(master_DA_features_df, axes=None)
+    # # figf_DA_vs_NRI_block_split_v1(master_DA_features_df, axes=None)
+    # # figf_summary_block_split(master_DA_features_df, axes=None)
+    # figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
     # figef_DA_vs_NRI(master_DA_features_df)
     # fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
     # figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=None)
