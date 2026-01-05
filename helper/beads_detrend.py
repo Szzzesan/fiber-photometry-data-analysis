@@ -25,7 +25,7 @@ def single_channel_detrend(y, channel_name, plot=False):
     # plt.show()
 
     # filter parameters
-    fc = 0.0001
+    fc = 0.002 # 0.0001
     d = 1
     # Positivity bias (peaks are positive)
     r = 10
@@ -54,11 +54,11 @@ def single_channel_detrend(y, channel_name, plot=False):
 
 def beads_detrend(raw_separated, session_label, plot='False'):
     xs = raw_separated['time_recording'].to_numpy() / 60000
-    y1 = raw_separated['green_right_actual'].to_numpy()
+    y1 = raw_separated['green_right_470'].to_numpy()
     detrended_r470, bg_r470 = single_channel_detrend(y1, 'green right 470', plot=False)
     y2 = raw_separated['green_right_isos'].to_numpy()
     detrended_r405, bg_r405 = single_channel_detrend(y2, 'green right isos', plot=False)
-    y3 = raw_separated['green_left_actual'].to_numpy()
+    y3 = raw_separated['green_left_470'].to_numpy()
     detrended_l470, bg_l470 = single_channel_detrend(y3, 'green left 470', plot=False)
     y4 = raw_separated['green_left_isos'].to_numpy()
     detrended_l405, bg_l405 = single_channel_detrend(y4, 'green left isos', plot=False)
