@@ -309,6 +309,11 @@ def calculate_dFF0_flexible(raw_separated, session_label,
                 # Rolling Mean F0
                 window_frames = int(baseline_window * fps)
                 F0 = signal.rolling(window=window_frames, center=True).mean()
+                start_mean = signal.iloc[:window_frames].mean()
+                end_mean = signal.iloc[-window_frames:].mean()
+                half_window = (window_frames - 1) // 2
+                F0.iloc[:half_window] = F0.iloc[:half_window].fillna(start_mean)
+                F0.iloc[-half_window:] = F0.iloc[-half_window:].fillna(end_mean)
         elif denominator_method == 'isos_rolling_window':
             if baseline_window is None:
                 raise ValueError(
@@ -316,6 +321,11 @@ def calculate_dFF0_flexible(raw_separated, session_label,
             else:
                 window_frames = int(baseline_window * fps)
                 F0 = fitted_isos.rolling(window=window_frames, center=True).mean()
+                start_mean = fitted_isos.iloc[:window_frames].mean()
+                end_mean = fitted_isos.iloc[-window_frames:].mean()
+                half_window = (window_frames - 1) // 2
+                F0.iloc[:half_window] = F0.iloc[:half_window].fillna(start_mean)
+                F0.iloc[-half_window:] = F0.iloc[-half_window:].fillna(end_mean)
 
         dFF0.iloc[:, i + 1] = dF / F0
 
@@ -375,25 +385,25 @@ if __name__ == '__main__':
         {'name': 'Original (Butterworth + 10sec 470nm Rolling)', 'detrend': 'butterworth',
          'denom': '470_rolling_window', 'win': 10},
 
-        # 1. The Original Method (fitted isos as Baseline)
-        {'name': 'Original (Butterworth + 10sec FitIso Rolling)', 'detrend': 'butterworth',
-         'denom': 'isos_rolling_window', 'win': 10},
-
-        # 2. No High-Pass Filter (Best for Tides?)
-        {'name': 'No Detrend (Raw + FitIso)', 'detrend': 'none',
-         'denom': 'fitted_isos', 'win': None},
-
-        # 3. BEADS Detrending (Advanced Baseline Removal)
-        {'name': 'BEADS Detrend + FitIso', 'detrend': 'beads',
-         'denom': 'fitted_isos', 'win': None},
+        # # 1. The Original Method (fitted isos as Baseline)
+        # {'name': 'Original (Butterworth + 10sec FitIso Rolling)', 'detrend': 'butterworth',
+        #  'denom': 'isos_rolling_window', 'win': 10},
+        #
+        # # 2. No High-Pass Filter (Best for Tides?)
+        # {'name': 'No Detrend (Raw + FitIso)', 'detrend': 'none',
+        #  'denom': 'fitted_isos', 'win': None},
+        #
+        # # 3. BEADS Detrending (Advanced Baseline Removal)
+        # {'name': 'BEADS Detrend + FitIso', 'detrend': 'beads',
+        #  'denom': 'fitted_isos', 'win': None},
 
         # 4. Long Rolling Baseline (6 Minutes)
-        {'name': 'No Detrend + 6min Rolling 470nm', 'detrend': 'none',
-         'denom': '470_rolling_window', 'win': 360},
+        {'name': 'BEADS + 6min Rolling 470nm', 'detrend': 'beads',
+         'denom': '470_rolling_window', 'win': 360}
 
-        # 5. Long Rolling Baseline (6 Minutes) with fitted isos
-        {'name': 'No Detrend + 6min Rolling FittedIso', 'detrend': 'none',
-         'denom': 'isos_rolling_window', 'win': 360}
+        # # 5. Long Rolling Baseline (6 Minutes) with fitted isos
+        # {'name': 'No Detrend + 6min Rolling FittedIso', 'detrend': 'none',
+        #  'denom': 'isos_rolling_window', 'win': 360}
     ]
 
     results_summary = []
@@ -527,8 +537,7 @@ if __name__ == '__main__':
             trace_df = pd.concat(pooled_trace_data, ignore_index=True)
             binned_df = bin_nonreward_data(trace_df, bin_size=0.5)
             plot_nonreward_traces_in_grid(binned_df, title_suffix=scen['name'])
-        plt.tight_layout()
-        plt.show()
+
 
 
 
