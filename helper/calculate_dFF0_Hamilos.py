@@ -14,7 +14,7 @@ def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False'
 
     # region Preprocessing
     # raw_separated = framedrop_remedy(raw_separated, plot=plot_middle_steps)
-    detrended = butterworth_detrend(raw_separated, fps=40, plot=plot_middle_steps, session_label=session_label)
+    # detrended = butterworth_detrend(raw_separated, fps=40, plot=plot_middle_steps, session_label=session_label)
     detrended = beads_detrend(raw_separated, plot=plot_middle_steps, session_label=session_label)
     # # region temporary: examining a random 150-sec snippet of raw data
     # snippet = detrended[(detrended['time_recording'] > 660000) & (detrended['time_recording'] < 810000)]
