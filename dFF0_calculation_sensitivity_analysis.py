@@ -381,9 +381,9 @@ if __name__ == '__main__':
 
     # B. Define Scenarios
     scenarios = [
-        # 0. The Original Method (10 sec rolling window as Baseline)
-        {'name': 'Original (Butterworth + 10sec 470nm Rolling)', 'detrend': 'butterworth',
-         'denom': '470_rolling_window', 'win': 10},
+        # # 0. The Original Method (10 sec rolling window as Baseline)
+        # {'name': 'Original (Butterworth + 10sec 470nm Rolling)', 'detrend': 'butterworth',
+        #  'denom': '470_rolling_window', 'win': 10},
 
         # # 1. The Original Method (fitted isos as Baseline)
         # {'name': 'Original (Butterworth + 10sec FitIso Rolling)', 'detrend': 'butterworth',
@@ -402,7 +402,7 @@ if __name__ == '__main__':
          'denom': '470_rolling_window', 'win': 360}
 
         # # 5. Long Rolling Baseline (6 Minutes) with fitted isos
-        # {'name': 'No Detrend + 6min Rolling FittedIso', 'detrend': 'none',
+        # {'name': 'BEADS + 6min Rolling FittedIso', 'detrend': 'beads',
         #  'denom': 'isos_rolling_window', 'win': 360}
     ]
 
