@@ -299,8 +299,9 @@ def calculate_dFF0_flexible(raw_separated, session_label,
 
         # Denominator: Flexible
         if denominator_method == 'fitted_isos':
-            # Standard dF/F0
+            Ft = signal
             F0 = fitted_isos
+            dF = Ft - F0
         elif denominator_method == '470_rolling_window':
             if baseline_window is None:
                 # Global Mean F0
@@ -314,10 +315,10 @@ def calculate_dFF0_flexible(raw_separated, session_label,
                 half_window = (window_frames - 1) // 2
                 F0.iloc[:half_window] = F0.iloc[:half_window].fillna(start_mean)
                 F0.iloc[-half_window:] = F0.iloc[-half_window:].fillna(end_mean)
+            dF = signal - fitted_isos
         elif denominator_method == 'isos_rolling_window':
             if baseline_window is None:
-                raise ValueError(
-                    f"There has to be a window length (in seconds) with denominator_method {denominator_method}")
+                F0 = fitted_isos.mean()
             else:
                 window_frames = int(baseline_window * fps)
                 F0 = fitted_isos.rolling(window=window_frames, center=True).mean()
@@ -326,6 +327,20 @@ def calculate_dFF0_flexible(raw_separated, session_label,
                 half_window = (window_frames - 1) // 2
                 F0.iloc[:half_window] = F0.iloc[:half_window].fillna(start_mean)
                 F0.iloc[-half_window:] = F0.iloc[-half_window:].fillna(end_mean)
+            dF = signal - fitted_isos
+        elif denominator_method == 'subtracted (470 nm - isos) rolling window':
+            Ft = signal - fitted_isos
+            if baseline_window is None:
+                F0 = signal.mean()
+            else:
+                window_frames = int(baseline_window * fps)
+                F0 = Ft.rolling(window=window_frames, center=True).mean()
+                start_mean = Ft.iloc[:window_frames].mean()
+                end_mean = Ft.iloc[-window_frames:].mean()
+                half_window = (window_frames - 1) // 2
+                F0.iloc[:half_window] = F0.iloc[:half_window].fillna(start_mean)
+                F0.iloc[-half_window:] = F0.iloc[-half_window:].fillna(end_mean)
+            dF = Ft - F0
 
         dFF0.iloc[:, i + 1] = dF / F0
 
@@ -381,9 +396,9 @@ if __name__ == '__main__':
 
     # B. Define Scenarios
     scenarios = [
-        # # 0. The Original Method (10 sec rolling window as Baseline)
-        # {'name': 'Original (Butterworth + 10sec 470nm Rolling)', 'detrend': 'butterworth',
-        #  'denom': '470_rolling_window', 'win': 10},
+        # 0. The Original Method (10 sec rolling window as Baseline)
+        {'name': 'Original (Butterworth + 10sec 470nm Rolling)', 'detrend': 'butterworth',
+         'denom': '470_rolling_window', 'win': 10},
 
         # # 1. The Original Method (fitted isos as Baseline)
         # {'name': 'Original (Butterworth + 10sec FitIso Rolling)', 'detrend': 'butterworth',
@@ -399,11 +414,11 @@ if __name__ == '__main__':
 
         # 4. Long Rolling Baseline (6 Minutes)
         {'name': 'BEADS + 6min Rolling 470nm', 'detrend': 'beads',
-         'denom': '470_rolling_window', 'win': 360}
+         'denom': '470_rolling_window', 'win': 360},
 
-        # # 5. Long Rolling Baseline (6 Minutes) with fitted isos
-        # {'name': 'BEADS + 6min Rolling FittedIso', 'detrend': 'beads',
-        #  'denom': 'isos_rolling_window', 'win': 360}
+        # 5. Long Rolling Baseline (6 Minutes) with fitted isos
+        {'name': 'BEADS + 6min Rolling FittedIso', 'detrend': 'beads',
+         'denom': 'isos_rolling_window', 'win': 360}
     ]
 
     results_summary = []
