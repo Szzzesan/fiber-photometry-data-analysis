@@ -30,7 +30,7 @@ def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False'
     # endregion
 
     # region Subtraction
-    F_0_timewindow = 10
+    F_0_timewindow = 360
     fps = 40
     F_0_framewindow = F_0_timewindow * fps
     dFF0 = pd.DataFrame(
@@ -39,20 +39,20 @@ def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False'
     for i in range(num_color_site):
         hemisphere = fitted.columns[2 * i + 1][6:-4]
         F_0 = fitted.iloc[:, 2 * i + 1].rolling(window=F_0_framewindow, center=True).mean()
+        start_mean = fitted.iloc[:F_0_framewindow, 2 * i + 1].mean()
+        end_mean = fitted.iloc[-F_0_framewindow:, 2 * i + 1].mean()
+        half_window = (F_0_framewindow - 1) // 2
+        F_0.iloc[:half_window] = F_0.iloc[:half_window].fillna(start_mean)
+        F_0.iloc[-half_window:] = F_0.iloc[-half_window:].fillna(end_mean)
         dFF0.iloc[:, i + 1] = (fitted.iloc[:, 2 * i + 1] - fitted.iloc[:, 2 * (i + 1)]) / F_0
         dFF0[f'F0_{hemisphere}'] = F_0
-        # subtracted = fitted.iloc[:, 2*i+1] - fitted.iloc[:, 2*(i+1)] + fitted.iloc[:, 2*(i+1)].median()
-        # pad_width = F_0_framewindow//2
-        # subtracted_padded = np.pad(subtracted, pad_width=pad_width, mode='edge')
-        # F_0 = pd.Series(subtracted_padded).rolling(window=F_0_framewindow, center=True).mean().iloc[pad_width:-pad_width].reset_index(drop=True)
-        # dFF0.iloc[:, i + 1] = (fitted.iloc[:, 2 * i + 1] - F_0) / F_0
     # endregion
 
     dFF0.iloc[:, 0] = dFF0.iloc[:, 0].div(1000)
 
     if plot:
         plt.style.use('ggplot')
-        for i in range(len(dFF0.columns) - 1):
+        for i in [0, 1]:
             plt.plot(dFF0.iloc[24000:30000, 0], dFF0.iloc[24000:30000, i + 1] * 100, label=dFF0.columns.values[i + 1], alpha=0.7)
         plt.legend()
         plt.xlabel('Time recording (sec)')
