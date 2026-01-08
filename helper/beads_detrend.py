@@ -64,9 +64,9 @@ def beads_detrend(raw_separated, session_label, plot='False'):
     detrended_l405, bg_l405 = single_channel_detrend(y4, 'green left isos', plot=False)
 
     detrended = raw_separated
-    detrended['green_right_actual'] = detrended_r470
+    detrended['green_right_470'] = detrended_r470
     detrended['green_right_isos'] = detrended_r405
-    detrended['green_left_actual'] = detrended_l470
+    detrended['green_left_470'] = detrended_l470
     detrended['green_left_isos'] = detrended_l405
 
     if plot:

@@ -8,8 +8,8 @@ from helper.lin_reg_fit import lin_reg_fit
 import os
 
 
-def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False',
-                   plot_middle_steps='False', save='False'):
+def calculate_dFF0_corrected(raw_separated, session_label, save_path, plot='False',
+                             plot_middle_steps='False', save='False'):
     num_color_site = int(len(raw_separated.columns) / 2 - 1)
 
     # region Preprocessing
@@ -34,18 +34,26 @@ def calculate_dFF0_Hamilos(raw_separated, session_label, save_path, plot='False'
     fps = 40
     F_0_framewindow = F_0_timewindow * fps
     dFF0 = pd.DataFrame(
-        columns=['time_recording', fitted.columns.values[1][:-4], fitted.columns.values[3][:-4]])
-    dFF0.iloc[:, 0] = fitted.iloc[:, 0]
-    for i in range(num_color_site):
-        hemisphere = fitted.columns[2 * i + 1][6:-4]
-        F_0 = fitted.iloc[:, 2 * i + 1].rolling(window=F_0_framewindow, center=True).mean()
-        start_mean = fitted.iloc[:F_0_framewindow, 2 * i + 1].mean()
-        end_mean = fitted.iloc[-F_0_framewindow:, 2 * i + 1].mean()
+        columns=['time_recording', fitted.columns.values[1][:-4], fitted.columns.values[3][:-4]]) # for the end product
+    dFF0.iloc[:, 0] = denoised.iloc[:, 0]
+    dFF0_split_channel = denoised.copy()
+    F0_split_channel = denoised.copy()
+    for i in range(1, 5):
+        F0 = denoised.iloc[:, i].rolling(window=F_0_framewindow, center=True).mean()
+        start_mean = denoised.iloc[:F_0_framewindow, i].mean()
+        end_mean = denoised.iloc[-F_0_framewindow:, i].mean()
         half_window = (F_0_framewindow - 1) // 2
-        F_0.iloc[:half_window] = F_0.iloc[:half_window].fillna(start_mean)
-        F_0.iloc[-half_window:] = F_0.iloc[-half_window:].fillna(end_mean)
-        dFF0.iloc[:, i + 1] = (fitted.iloc[:, 2 * i + 1] - fitted.iloc[:, 2 * (i + 1)]) / F_0
-        dFF0[f'F0_{hemisphere}'] = F_0
+        F0.iloc[:half_window] = F0.iloc[:half_window].fillna(start_mean)
+        F0.iloc[-half_window:] = F0.iloc[-half_window:].fillna(end_mean)
+        Ft = denoised.iloc[:, i]
+        dF = Ft - F0
+        dFF0_split_channel.iloc[:, i] = dF/F0
+        F0_split_channel.iloc[:, i] = F0
+
+    dFF0['green_right'] = dFF0_split_channel['green_right_470'] - dFF0_split_channel['green_right_isos']
+    dFF0['green_left'] = dFF0_split_channel['green_left_470'] - dFF0_split_channel['green_left_isos']
+    dFF0['F0_right'] = F0_split_channel['green_right_470'] - F0_split_channel['green_right_isos']
+    dFF0['F0_left'] = F0_split_channel['green_left_470'] - F0_split_channel['green_left_isos']
     # endregion
 
     dFF0.iloc[:, 0] = dFF0.iloc[:, 0].div(1000)

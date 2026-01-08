@@ -32,7 +32,7 @@ class OneSession:
         self.fig_export_dir = os.path.join(self.animal_dir, config.FIGURE_SUBDIR, self.signal_dir[-21:-7])
         self.processed_dir = os.path.join(self.animal_dir, config.PROCESSED_DATA_SUBDIR)
         os.makedirs(self.processed_dir, exist_ok=True)
-        print("This class is" + " session " + self.signal_dir[-23:-7])
+        print("\nThis class is" + " session " + self.signal_dir[-23:-7])
         self.pi_events, self.neural_events = helper.data_read_sync(self.behav_dir, self.signal_dir, self.arduino_dir)
         if self.pi_events['task'].iloc[10] == 'single_reward':
             self.task = 'single_reward'
@@ -84,11 +84,11 @@ class OneSession:
         raw_separated = helper.de_interleave(self.neural_events, session_label=self.signal_dir[-23:-7],
                                              plot=plot_middle_step,
                                              save=0, save_path=self.fig_export_dir)
-        self.dFF0 = helper.calculate_dFF0_Hamilos(raw_separated,
-                                                  session_label=f'{self.animal}: {self.signal_dir[-23:-7]}',
-                                                  plot=plot,
-                                                  plot_middle_steps=plot_middle_step, save=save,
-                                                  save_path=self.fig_export_dir)
+        self.dFF0 = helper.calculate_dFF0_corrected(raw_separated,
+                                                    session_label=f'{self.animal}: {self.signal_dir[-23:-7]}',
+                                                    plot=plot,
+                                                    plot_middle_steps=plot_middle_step, save=save,
+                                                    save_path=self.fig_export_dir)
         self.dFF0.name = 'dFF0'
         self.zscore = pd.DataFrame({'time_recording': self.dFF0.time_recording})
         self.zscore['green_right'] = stats.zscore(self.dFF0['green_right'].tolist(), nan_policy='omit')
@@ -1644,7 +1644,7 @@ class OneSession:
 if __name__ == '__main__':
     test_session = OneSession('SZ036', 15, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
-    test_session.calculate_dFF0(plot=0, plot_middle_step=1, save=0)
+    test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
     # test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)
