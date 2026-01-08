@@ -365,7 +365,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
     if return_handle:
         fig.suptitle(suptitle)
         fig.tight_layout()
-        # fig.show()
+        fig.show()
 
 
 def plot_DA_vs_NRI_scatters_with_average_curve(master_df, split_block=0, axes=None):
