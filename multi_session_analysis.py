@@ -561,7 +561,7 @@ if __name__ == '__main__':
     summary_RK7 = multi_session_analysis('RK007', session_list, include_branch='left', port_swap=1)
     session_list = np.arange(14, 25)
     summary_RK8 = multi_session_analysis('RK008', session_list, include_branch='left', port_swap=0)
-    session_list = np.arange(0, 15)
+    session_list = np.arange(1, 15)
     summary_RK9 = multi_session_analysis('RK009', session_list, include_branch='left', port_swap=1)
     session_list = np.arange(0, 13)
     summary_RK10 = multi_session_analysis('RK010', session_list, include_branch='both', port_swap=0)
