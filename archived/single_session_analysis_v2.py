@@ -28,8 +28,8 @@ def single_session_analysis(animal_dir, signal_filename, arduino_filename, behav
     helper.check_framedrop(neural_events)
     raw_separated = helper.de_interleave(neural_events, session_label=signal_dir[-23:-7], plot=0, save=0,
                                          save_path=fig_export_dir)
-    dFF0 = helper.calculate_dFF0_Hamilos(raw_separated, session_label=signal_dir[-23:-7], plot=0,
-                                         plot_middle_steps=0, save=0, save_path=fig_export_dir)
+    dFF0 = helper.calculate_dFF0_corrected(raw_separated, session_label=signal_dir[-23:-7], plot=0,
+                                           plot_middle_steps=0, save=0, save_path=fig_export_dir)
     dFF0.name = 'dFF0'
     # helper.export_df_to_csv(dFF0, fp_export_dir)
     # endregion

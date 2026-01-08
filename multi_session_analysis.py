@@ -13,6 +13,7 @@ from L import L
 import pandas as pd
 from scipy import stats
 from collections import namedtuple
+from tqdm import tqdm
 import pingouin as pg  # packages for anova according to Google
 
 
@@ -454,7 +455,7 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
     lick_mod_low = [None] * len(behav_file_list)
     lick_mod_high = [None] * len(behav_file_list)
     DA_block_transition_list = [None] * len(behav_file_list)
-    for i in session_list:
+    for i in tqdm(session_list, desc=f"Analyzing {animal_str}"):
         try:
             ani_summary.session_obj_list[i] = OneSession(animal_str, i, include_branch=include_branch,
                                                          port_swap=port_swap)
@@ -470,12 +471,12 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
             ani_summary.session_obj_list[i].save_dFF0_and_zscore(format='parquet')
             # DA_block_transition_list[i] = ani_summary.session_obj_list[i].bg_port_in_block_reversal(plot_single_traes=0,
             #                                                                                         plot_average=0)
-            # ani_summary.session_obj_list[i].extract_lastreward_DA()
-            # ani_summary.session_obj_list[i].save_lastreward_df()
-            # ani_summary.session_obj_list[i].extract_nonreward_DA_vs_time(exclusion_start_relative=0, exclusion_end_relative=2)
-            # ani_summary.session_obj_list[i].save_nonreward_DA()
-            # ani_summary.session_obj_list[i].extract_firstmoment_nonreward_DA_vs_time()
-            # ani_summary.session_obj_list[i].save_nonreward_1stmoment_DA()
+            ani_summary.session_obj_list[i].extract_lastreward_DA()
+            ani_summary.session_obj_list[i].save_lastreward_df()
+            ani_summary.session_obj_list[i].extract_nonreward_DA_vs_time(exclusion_start_relative=0, exclusion_end_relative=2)
+            ani_summary.session_obj_list[i].save_nonreward_DA()
+            ani_summary.session_obj_list[i].extract_firstmoment_nonreward_DA_vs_time()
+            ani_summary.session_obj_list[i].save_nonreward_1stmoment_DA()
             # ani_summary.session_obj_list[i].visualize_nonreward_DA(plot_1st_moment=True, plot_all=False, bin_size=0.6)
             # ani_summary.session_obj_list[i].extract_bg_behav_by_trial()
             # ani_summary.session_obj_list[i].save_bg_behavior_trial_df(format='parquet')
@@ -486,8 +487,8 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
             # ani_summary.session_obj_list[i].extract_transient(plot_zscore=0)
             # ani_summary.session_obj_list[i].visualize_correlation_scatter(save=0)
             # ani_summary.session_obj_list[i].extract_reward_features_and_DA(save_dataframe=0)
-            # ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
-            # ani_summary.session_obj_list[i].save_DA_vs_features(format='parquet')
+            ani_summary.session_obj_list[i].visualize_DA_vs_NRI_IRI()
+            ani_summary.session_obj_list[i].save_DA_vs_features(format='parquet')
             # ani_summary.session_obj_list[i].visualize_average_traces(variable='time_in_port', method='even_time',
             #                                                          block_split=False,
             #                                                          plot_linecharts=0,
@@ -495,8 +496,8 @@ def multi_session_analysis(animal_str, session_list, include_branch='both', port
             # ani_summary.session_obj_list[i].extract_binned_da_vs_reward_history_matrix(binsize=0.1, save=1)
 
         except:
-            print(f"skipped session {i} because of error!!!")
-            print("----------------------------------")
+            tqdm.write(f"Skipped session {i} for {animal_str} due to error")
+            tqdm.write("----------------------------------")
             continue
     # ses_selected_l, ses_selected_r = visualize_transient_consistency(session_obj_list, save=1, save_path=xsession_figure_export_dir)
     # visualize_NRI_vs_amplitude_families(ani_summary, variable='time_in_port', block_split=True, normalized=False, save=False,
@@ -535,23 +536,15 @@ if __name__ == '__main__':
     # session_list = [0, 1, 2, 4, 11, 12, 13, 14, 15, 17, 18, 20, 22, 23, 24]
     # summary_RK6 = multi_session_analysis('RK006', session_list, include_branch='both', port_swap=1)
 
-    session_list = np.arange(0, 20)
-    summary_RK7 = multi_session_analysis('RK007', session_list, include_branch='left', port_swap=1)
-    session_list = np.arange(14, 25)
-    summary_RK8 = multi_session_analysis('RK008', session_list, include_branch='left', port_swap=0)
-    session_list = np.arange(0, 15)
-    summary_RK9 = multi_session_analysis('RK009', session_list, include_branch='left', port_swap=1)
-    session_list = np.arange(0, 13)
-    summary_RK10 = multi_session_analysis('RK010', session_list, include_branch='both', port_swap=0)
+    # session_list = [1, 2, 3, 5, 7, 9, 11, 12, 14, 15, 19, 22, 23, 24, 25]
+    # summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')
+    #
+    # session_list = [0, 1, 2, 4, 5, 6, 8, 9, 11, 15, 16, 17, 18, 19, 20, 22, 24, 25, 27, 28, 29, 31, 32, 33, 35]
+    # summary_037 = multi_session_analysis('SZ037', session_list, include_branch='both')
 
-    session_list = [1, 2, 3, 5, 7, 9, 11, 12, 14, 15, 19, 22, 23, 24, 25]
-    summary_036 = multi_session_analysis('SZ036', session_list, include_branch='both')
-
-    session_list = [0, 1, 2, 4, 5, 6, 8, 9, 11, 15, 16, 17, 18, 19, 20, 22, 24, 25, 27, 28, 29, 31, 32, 33, 35]
-    summary_037 = multi_session_analysis('SZ037', session_list, include_branch='both')
-
-    session_list = [1, 2, 3, 4, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 32,
-                    33, 34, 35, 36, 37, 38]
+    # session_list = [1, 2, 3, 4, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 32,
+    #                 33, 34, 35, 36, 37, 38]
+    session_list = [35, 36, 37, 38]
     summary_038 = multi_session_analysis('SZ038', session_list, include_branch='both')
 
     session_list = [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 22]
@@ -565,6 +558,14 @@ if __name__ == '__main__':
     session_list = [0, 1, 3, 4, 5, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23]
     summary_043 = multi_session_analysis('SZ043', session_list, include_branch='only_right')
 
+    session_list = np.arange(0, 20)
+    summary_RK7 = multi_session_analysis('RK007', session_list, include_branch='left', port_swap=1)
+    session_list = np.arange(14, 25)
+    summary_RK8 = multi_session_analysis('RK008', session_list, include_branch='left', port_swap=0)
+    session_list = np.arange(0, 15)
+    summary_RK9 = multi_session_analysis('RK009', session_list, include_branch='left', port_swap=1)
+    session_list = np.arange(0, 13)
+    summary_RK10 = multi_session_analysis('RK010', session_list, include_branch='both', port_swap=0)
 
     # plot the 4-point line chart DA vs. NRI for each animal
     def get_mean_sem_DA_for_feature(df, var='NRI', sample_per_bin=250):

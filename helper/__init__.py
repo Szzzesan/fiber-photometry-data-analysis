@@ -4,7 +4,7 @@ from helper.export_df_to_txt import export_df_to_txt
 from helper.extract_behavior_events import extract_behavior_events
 from helper.data_read_sync import data_read_sync
 from helper.calculate_dFF0 import calculate_dFF0
-from helper.calculate_dFF0_Hamilos import calculate_dFF0_Hamilos
+from helper.calculate_dFF0_corrected import calculate_dFF0_corrected
 from helper.export_df_to_pkl import export_df_to_pkl
 from helper.extract_trial import extract_trial
 from helper.get_event_by_trial import get_reward_by_trial
