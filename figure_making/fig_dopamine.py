@@ -225,7 +225,7 @@ def resample_data_for_heatmap(zscore, zscore_branch, reward_df, cutoff_pre_rewar
 
 
 def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatmap_matrix, palette='Reds_r', split_cat=0,
-                                 legend_title='Time in Port', session_name=None, axes=None):
+                                 legend_title='Time in Port', animal=None, hemi=None, session_name=None, axes=None):
     """
     This function takes in prepared data and plot a heatmap and a plot with mean traces and error bands side by side
     """
@@ -259,7 +259,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
         ax_heatmap = fig.add_subplot(gs_inner[0, 1])
         ax_cbar = fig.add_subplot(gs_inner[0, 2])
         ax_mean = fig.add_subplot(gs_outer[0, 1])
-        suptitle = session_name
+        suptitle = f'{animal}{hemi}: {session_name}'
         return_handle = True
     else:
         fig = None
@@ -365,7 +365,7 @@ def plot_heatmap_and_mean_traces(time_vector, category_codes, cat_labels, heatma
     if return_handle:
         fig.suptitle(suptitle)
         fig.tight_layout()
-        fig.show()
+        # fig.show()
 
 
 def plot_DA_vs_NRI_scatters_with_average_curve(master_df, split_block=0, axes=None):
@@ -536,7 +536,8 @@ def figc_example_session_heatmap_split_by_NRI_v2(zscore, zscore_branch, reward_d
                               axes=axes)
 
 
-def figc_example_session_heatmap_split_by_NRI(zscore, zscore_branch, reward_df, axes=None):
+def figc_example_session_heatmap_split_by_NRI(zscore, zscore_branch, reward_df, animal=None, hemi=None, session=None,
+                                              axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
         zscore, zscore_branch, reward_df,
         cutoff_pre_reward=-0.5,
@@ -544,8 +545,10 @@ def figc_example_session_heatmap_split_by_NRI(zscore, zscore_branch, reward_df, 
         bin_size_s=0.05,
         category_by='time_in_port'
     )
+
     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Reds_r', split_cat=0,
-                                 legend_title='Reward Time\nfrom Entry (s)', axes=axes)
+                                 legend_title=f'Reward Time\nfrom Entry (s)', animal=animal, hemi=hemi,
+                                 session_name=session, axes=axes)
 
 
 def figd_example_session_heatmap_split_by_block_v2(zscore, zscore_branch, reward_df, DA_features_df, axes=None):
@@ -563,7 +566,8 @@ def figd_example_session_heatmap_split_by_block_v2(zscore, zscore_branch, reward
                               axes=axes)
 
 
-def figd_example_session_heatmap_split_by_block(zscore, zscore_branch, reward_df, axes=None):
+def figd_example_session_heatmap_split_by_block(zscore, zscore_branch, reward_df, animal=None, hemi=None, session=None,
+                                                axes=None):
     time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
         zscore, zscore_branch, reward_df,
         cutoff_pre_reward=-0.5,
@@ -572,7 +576,8 @@ def figd_example_session_heatmap_split_by_block(zscore, zscore_branch, reward_df
         category_by='block'  # Use 'block' to test the new logic
     )
     plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
-                                 legend_title='Context\nReward Rate', axes=axes)
+                                 legend_title=f'Context\nReward Rate', animal=animal, hemi=hemi, session_name=session,
+                                 axes=axes)
 
 
 def get_mean_sem_DA_for_feature(df, var='NRI', sample_per_bin=250):
@@ -683,6 +688,7 @@ def figef_DA_vs_NRI(master_df, axes=None):
     if return_handle:
         fig.show()
         return fig, axes
+
 
 def figf_DA_vs_NRI_block_split_v1(master_df, axes=None):
     data = master_df[(master_df['IRI'] > 1)]
@@ -809,12 +815,14 @@ def _paired_t_for_blocks(summary_data):
         print(f't_stat = {t_stat:.3f}, p_value = {p_value:.4f}')
     return compared, paired_t_stats, paired_p_values
 
+
 def _paired_t_for_collapsed_blocks(grouped_data):
     pivot_df = grouped_data.pivot_table(index=['session', 'hemisphere'], columns='block', values='DA')
     DA_low = pivot_df['0.4']
     DA_high = pivot_df['0.8']
     t_stat, p_value = stats.ttest_rel(DA_low, DA_high)
     return t_stat, p_value
+
 
 def _set_axes_for_box_and_swarm(axes):
     axes.set_xticklabels(axes.get_xticklabels(), rotation=15, ha='right')
@@ -864,11 +872,12 @@ def fige_DA_vs_NRI_v1(master_df, axes=None):
     ax.set_ylim([1.85, 3.85])
     ax.set_xlabel('Reward Time from Entry (s)')
     ax.set_ylabel('Peak Amplitude')
-        # ax.set_title('DA vs. NRI')
+    # ax.set_title('DA vs. NRI')
 
     if return_handle:
         fig.show()
         return fig, axes
+
 
 def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
     if axes is None:
@@ -1049,7 +1058,6 @@ def figf_summary_block_split(master_df, axes=None):
                 showfliers=False,
                 ax=axes)
 
-
     # Add stats annotation
     t_stat, p_value = _paired_t_for_collapsed_blocks(grouped_data)
     if p_value < 0.0001:
@@ -1207,9 +1215,9 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     # --- Step 2: Define and Fit the Model ---
     model_formula = (
         "DA ~ (logNRI_std + logIRI_std "
-          "+ C(block, Treatment('0.8')) "
-          "+ C(side_relative, Treatment('ipsi')))**3 " # keep any 3-way interaction among these 4 regressors
-          "+ C(hemisphere, Treatment('right'))") # the technical/systematic bias
+        "+ C(block, Treatment('0.8')) "
+        "+ C(side_relative, Treatment('ipsi')))**3 "  # keep any 3-way interaction among these 4 regressors
+        "+ C(hemisphere, Treatment('right'))")  # the technical/systematic bias
 
     random_slopes = (
         "1 + "  # Random Intercept for Animal
@@ -1507,7 +1515,7 @@ def setup_axes_v2():
         fig.add_subplot(gs[col_2_splits[3]:col_2_splits[4], row_3_splits[-2]:row_3_splits[-1]]),
         # block comparison collapsed across all delays
         fig.add_subplot(gs[col_2_splits[5]:col_2_splits[6], row_2_splits[-2]:row_2_splits[-1]])
-                        # row_2_splits[-2]:int((row_2_splits[-1] - row_2_splits[-2]) / 2 + row_2_splits[-2])]),
+        # row_2_splits[-2]:int((row_2_splits[-1] - row_2_splits[-2]) / 2 + row_2_splits[-2])]),
         # coefficient plot
 
     ]
@@ -1617,11 +1625,13 @@ def main():
     animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # animal_ids=["SZ036"]
     master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                day_0='2023-11-30', hemisphere_qc=1, file_format='parquet')
+                                                                day_0='2023-11-30', hemisphere_qc=1,
+                                                                file_format='parquet')
 
     animal_ids = ["RK007", "RK008"]
     master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-                                                                day_0='2025-06-17', hemisphere_qc=1, file_format='parquet')
+                                                                day_0='2025-06-17', hemisphere_qc=1,
+                                                                file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
 
     # --- end of data preparation ---
@@ -1700,7 +1710,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
 
     # # --- Plot example trial 1d ---
     # animal_str = 'SZ037'
@@ -1717,12 +1727,13 @@ if __name__ == '__main__':
     # # --- Plot example sessions heatmap and average traces ---
     # animal_str = 'SZ036'
     # session_name = '2023-12-30T19_57'
+
     # zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_long_name=session_name,
     #                                                     file_format='parquet')
     # reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_long_name=session_name,
     #                                                file_format='parquet')
-    # figc_example_session_heatmap_split_by_NRI(zscore_heatmap, reward_df, axes=None)
-    # figd_example_session_heatmap_split_by_block(zscore_heatmap, reward_df, axes=None)
+    # figc_example_session_heatmap_split_by_NRI(zscore_heatmap, 'green_right', reward_df, axes=None)
+    # figd_example_session_heatmap_split_by_block(zscore_heatmap, 'green_right', reward_df, axes=None)
 
     ## --- Plot DA vs. NRI for all data ---
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
@@ -1752,42 +1763,68 @@ if __name__ == '__main__':
     # master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
     # figf_DA_vs_reward_prob(master_DA_features_df, axes=None)
 
-    ## --- Plot heatmaps from every single session ---
-    # tuple_list = [('SZ036', 16), ('SZ037', 25), ('SZ038', 29), ('SZ039', 20), ('SZ042', 20), ('SZ043', 18),
-    #               ('RK007', 19), ('RK008', 11)]
-    # for (ani, session_num) in tuple_list[:]:
-    #     animal_str = ani
-    #     # # session_name = '2024-01-04T15_49'
-    #     for i in range(0, session_num):
-    #         session_id = i
-    #         _, zscore_heatmap = data_loader.load_session_dataframe(animal_str, 'zscore', session_id=i,
-    #                                                             file_format='parquet')
-    #         session_name, reward_df = data_loader.load_session_dataframe(animal_str, 'expreward_df', session_id=i,
-    #                                                        file_format='parquet')
-    #
-    #
-    #         time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
-    #             zscore_heatmap, reward_df,
-    #             cutoff_pre_reward=-0.5,
-    #             cutoff_post_reward=2,
-    #             bin_size_s=0.05,
-    #             category_by='time_in_port'  # Use 'block' to test the new logic
-    #         )
-    #         plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Reds_r', split_cat=0,
-    #                                      session_name=session_name, axes=None)
-    #
-    #
-    # time_vec, cat_codes, cat_labels, heatmap_mat = resample_data_for_heatmap(
-    #     zscore_heatmap, reward_df,
-    #     cutoff_pre_reward=-0.5,
-    #     cutoff_post_reward=2,
-    #     bin_size_s=0.05,
-    #     category_by='block'  # Use 'block' to test the new logic
-    # )
-    # plot_heatmap_and_mean_traces(time_vec, cat_codes, cat_labels, heatmap_mat, palette='Set2', split_cat=1,
-    #                              legend_title='Context Reward Rate', session_name=session_name, axes=None)
-    #
-    # time.sleep(2)
+    # --- Plot heatmaps from every single session ---
+    # Note: before running this part, go to data_loader.load_session_dataframe and add session_long_name to the return list
+    tuple_list = [('SZ036', 15), ('SZ037', 25), ('SZ038', 29), ('SZ039', 20), ('SZ042', 20), ('SZ043', 18),
+                  ('RK007', 19), ('RK008', 11), ('RK009', 14), ('RK010', 13)]
+    import quality_control as qc
+
+    qc_selections = qc.qc_selections
+    import os
+    import config as cfg
+
+    main_root_dir = cfg.MAIN_DATA_ROOT
+    from tqdm import tqdm
+    import warnings
+
+    for (animal_str, total_sessions) in tqdm(tuple_list, desc="Overall Progress"):
+        tqdm.write(f"Currently processing {animal_str}")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            output_dir = os.path.join(main_root_dir, animal_str, cfg.FIGURE_SUBDIR, 'heatmaps')
+            os.makedirs(output_dir, exist_ok=True)
+            # use leave=False to clear the inner bar when the animal is finished
+            for session_id in tqdm(range(total_sessions), desc=f"Sessions for {animal_str}", leave=False):
+                # Get the allowed hemispheres for this specific animal
+                allowed_hemis = qc_selections.get(animal_str, set())
+
+                for hemi in allowed_hemis:
+
+                    # Construct the branch string (e.g., 'green_left')
+                    branch = f'green_{hemi}'
+
+                    # 1. Load the data
+                    # Note: session_id is used here as 'num_id' from your example
+                    session_long_name, zscore_heatmap = data_loader.load_session_dataframe(
+                        animal_str, 'zscore', session_id=session_id, file_format='parquet'
+                    )
+                    _, reward_df = data_loader.load_session_dataframe(
+                        animal_str, 'expreward_df', session_id=session_id, file_format='parquet'
+                    )
+
+                    # --- Plot 1: NRI Split ---
+                    fig_nri = figc_example_session_heatmap_split_by_NRI(
+                        zscore_heatmap, branch, reward_df,
+                        animal=animal_str, hemi=hemi, session=session_long_name, axes=None
+                    )
+                    # Capture current figure, save, and close
+                    if fig_nri is None:
+                        fig_nri = plt.gcf()
+                    fig_nri.savefig(f"{output_dir}/{animal_str}_{session_long_name}_{hemi}_NRI_heatmap.png")
+                    plt.close(fig_nri)
+
+                    # --- Plot 2: Block Split ---
+                    fig_block = figd_example_session_heatmap_split_by_block(
+                        zscore_heatmap, branch, reward_df,
+                        animal=animal_str, hemi=hemi, session=session_long_name, axes=None
+                    )
+                    # Capture current figure, save, and close
+                    if fig_block is None:
+                        fig_block = plt.gcf()
+                    plt.savefig(f"{output_dir}/{animal_str}_{session_long_name}_{hemi}_block_heatmap.png")
+                    plt.close(fig_block)
+
+                    print(f"Finished processing: {animal_str}, Session: {session_long_name}, Hemi: {hemi}")
 
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # # animal_ids = ["SZ036"]
