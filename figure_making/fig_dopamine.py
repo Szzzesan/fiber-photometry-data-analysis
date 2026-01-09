@@ -1216,7 +1216,7 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
     model_formula = (
         "DA ~ (logNRI_std + logIRI_std "
         "+ C(block, Treatment('0.8')) "
-        "+ C(side_relative, Treatment('ipsi')))**3 "  # keep any 3-way interaction among these 4 regressors
+        "+ C(side_relative, Treatment('ipsi')))**2 "  # keep any 3-way interaction among these 4 regressors
         "+ C(hemisphere, Treatment('right'))")  # the technical/systematic bias
 
     random_slopes = (
@@ -1257,14 +1257,14 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
         'C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'side',
         'logNRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'time * side',
         'logNRI_std:logIRI_std': 'time * IRI',
-        'logNRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'time * context',
-        'logIRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'IRI * context',
+        'logNRI_std:C(block, Treatment(\'0.8\'))[T.0.4]': 'time * context',
+        'logIRI_std:C(block, Treatment(\'0.8\'))[T.0.4]': 'IRI * context',
         'logIRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'IRI * side',
         'C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'context * side',
-        'logNRI_std:logIRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'time * IRI * context',
-        'logIRI_std:C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'IRI * context * side',
-        'logNRI_std:logIRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'time * IRI * side',
-        'logNRI_std:C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'time * context * side'
+        # 'logNRI_std:logIRI_std:C(block, Treatment(reference=\'0.8\'))[T.0.4]': 'time * IRI * context',
+        # 'logIRI_std:C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'IRI * context * side',
+        # 'logNRI_std:logIRI_std:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'time * IRI * side',
+        # 'logNRI_std:C(block, Treatment(\'0.8\'))[T.0.4]:C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'time * context * side'
     }
 
     conf_to_plot_renamed = conf_to_plot.rename(index=name_map)
@@ -1277,7 +1277,9 @@ def figg_LMEM_coefficients_v3(master_df, axes=None):
         'context * side',
         'IRI * side',
         'time * IRI',
-        'time * IRI * side'
+        'time * context',
+        'IRI * context',
+        # 'time * IRI * side'
     ]
     # Filter for any names in desired_order that actually exist in the renamed index
     final_order = [name for name in desired_order if name in conf_to_plot_renamed.index]
@@ -1736,21 +1738,22 @@ if __name__ == '__main__':
     # figd_example_session_heatmap_split_by_block(zscore_heatmap, 'green_right', reward_df, axes=None)
 
     ## --- Plot DA vs. NRI for all data ---
-    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-    #                                                             day_0='2023-11-30', file_format='parquet')
-    #
-    # animal_ids = ["RK007", "RK008"]
-    # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-    #                                                             day_0='2025-06-17', file_format='parquet')
-    # master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+                                                                day_0='2023-11-30', file_format='parquet')
+
+    animal_ids = ["RK007", "RK008"]
+    master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+                                                                day_0='2025-06-17', file_format='parquet')
+    master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
     # # fige_DA_vs_NRI_v1(master_DA_features_df, axes=None)
     # # figf_DA_vs_NRI_block_split_v1(master_DA_features_df, axes=None)
     # # figf_summary_block_split(master_DA_features_df, axes=None)
-    # figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
+
     # figef_DA_vs_NRI(master_DA_features_df)
-    # fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
-    # figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=None)
+    fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=None)
+    figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=None)
+    figg_LMEM_coefficients_v3(master_DA_features_df, axes=None)
     # figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=450, axes=None)
     ## --- Plot DA amplitudes vs. reward probability ---
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
@@ -1765,66 +1768,66 @@ if __name__ == '__main__':
 
     # --- Plot heatmaps from every single session ---
     # Note: before running this part, go to data_loader.load_session_dataframe and add session_long_name to the return list
-    tuple_list = [('SZ036', 15), ('SZ037', 25), ('SZ038', 29), ('SZ039', 20), ('SZ042', 20), ('SZ043', 18),
-                  ('RK007', 19), ('RK008', 11), ('RK009', 14), ('RK010', 13)]
-    import quality_control as qc
-
-    qc_selections = qc.qc_selections
-    import os
-    import config as cfg
-
-    main_root_dir = cfg.MAIN_DATA_ROOT
-    from tqdm import tqdm
-    import warnings
-
-    for (animal_str, total_sessions) in tqdm(tuple_list, desc="Overall Progress"):
-        tqdm.write(f"Currently processing {animal_str}")
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            output_dir = os.path.join(main_root_dir, animal_str, cfg.FIGURE_SUBDIR, 'heatmaps')
-            os.makedirs(output_dir, exist_ok=True)
-            # use leave=False to clear the inner bar when the animal is finished
-            for session_id in tqdm(range(total_sessions), desc=f"Sessions for {animal_str}", leave=False):
-                # Get the allowed hemispheres for this specific animal
-                allowed_hemis = qc_selections.get(animal_str, set())
-
-                for hemi in allowed_hemis:
-
-                    # Construct the branch string (e.g., 'green_left')
-                    branch = f'green_{hemi}'
-
-                    # 1. Load the data
-                    # Note: session_id is used here as 'num_id' from your example
-                    session_long_name, zscore_heatmap = data_loader.load_session_dataframe(
-                        animal_str, 'zscore', session_id=session_id, file_format='parquet'
-                    )
-                    _, reward_df = data_loader.load_session_dataframe(
-                        animal_str, 'expreward_df', session_id=session_id, file_format='parquet'
-                    )
-
-                    # --- Plot 1: NRI Split ---
-                    fig_nri = figc_example_session_heatmap_split_by_NRI(
-                        zscore_heatmap, branch, reward_df,
-                        animal=animal_str, hemi=hemi, session=session_long_name, axes=None
-                    )
-                    # Capture current figure, save, and close
-                    if fig_nri is None:
-                        fig_nri = plt.gcf()
-                    fig_nri.savefig(f"{output_dir}/{animal_str}_{session_long_name}_{hemi}_NRI_heatmap.png")
-                    plt.close(fig_nri)
-
-                    # --- Plot 2: Block Split ---
-                    fig_block = figd_example_session_heatmap_split_by_block(
-                        zscore_heatmap, branch, reward_df,
-                        animal=animal_str, hemi=hemi, session=session_long_name, axes=None
-                    )
-                    # Capture current figure, save, and close
-                    if fig_block is None:
-                        fig_block = plt.gcf()
-                    plt.savefig(f"{output_dir}/{animal_str}_{session_long_name}_{hemi}_block_heatmap.png")
-                    plt.close(fig_block)
-
-                    print(f"Finished processing: {animal_str}, Session: {session_long_name}, Hemi: {hemi}")
+    # tuple_list = [('SZ036', 15), ('SZ037', 25), ('SZ038', 29), ('SZ039', 20), ('SZ042', 20), ('SZ043', 18),
+    #               ('RK007', 19), ('RK008', 11), ('RK009', 14), ('RK010', 13)]
+    # import quality_control as qc
+    #
+    # qc_selections = qc.qc_selections
+    # import os
+    # import config as cfg
+    #
+    # main_root_dir = cfg.MAIN_DATA_ROOT
+    # from tqdm import tqdm
+    # import warnings
+    #
+    # for (animal_str, total_sessions) in tqdm(tuple_list, desc="Overall Progress"):
+    #     tqdm.write(f"Currently processing {animal_str}")
+    #     with warnings.catch_warnings():
+    #         warnings.simplefilter("ignore")
+    #         output_dir = os.path.join(main_root_dir, animal_str, cfg.FIGURE_SUBDIR, 'heatmaps')
+    #         os.makedirs(output_dir, exist_ok=True)
+    #         # use leave=False to clear the inner bar when the animal is finished
+    #         for session_id in tqdm(range(total_sessions), desc=f"Sessions for {animal_str}", leave=False):
+    #             # Get the allowed hemispheres for this specific animal
+    #             allowed_hemis = qc_selections.get(animal_str, set())
+    #
+    #             for hemi in allowed_hemis:
+    #
+    #                 # Construct the branch string (e.g., 'green_left')
+    #                 branch = f'green_{hemi}'
+    #
+    #                 # 1. Load the data
+    #                 # Note: session_id is used here as 'num_id' from your example
+    #                 session_long_name, zscore_heatmap = data_loader.load_session_dataframe(
+    #                     animal_str, 'zscore', session_id=session_id, file_format='parquet'
+    #                 )
+    #                 _, reward_df = data_loader.load_session_dataframe(
+    #                     animal_str, 'expreward_df', session_id=session_id, file_format='parquet'
+    #                 )
+    #
+    #                 # --- Plot 1: NRI Split ---
+    #                 fig_nri = figc_example_session_heatmap_split_by_NRI(
+    #                     zscore_heatmap, branch, reward_df,
+    #                     animal=animal_str, hemi=hemi, session=session_long_name, axes=None
+    #                 )
+    #                 # Capture current figure, save, and close
+    #                 if fig_nri is None:
+    #                     fig_nri = plt.gcf()
+    #                 fig_nri.savefig(f"{output_dir}/{animal_str}_{session_long_name}_{hemi}_NRI_heatmap.png")
+    #                 plt.close(fig_nri)
+    #
+    #                 # --- Plot 2: Block Split ---
+    #                 fig_block = figd_example_session_heatmap_split_by_block(
+    #                     zscore_heatmap, branch, reward_df,
+    #                     animal=animal_str, hemi=hemi, session=session_long_name, axes=None
+    #                 )
+    #                 # Capture current figure, save, and close
+    #                 if fig_block is None:
+    #                     fig_block = plt.gcf()
+    #                 plt.savefig(f"{output_dir}/{animal_str}_{session_long_name}_{hemi}_block_heatmap.png")
+    #                 plt.close(fig_block)
+    #
+    #                 print(f"Finished processing: {animal_str}, Session: {session_long_name}, Hemi: {hemi}")
 
     # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     # # animal_ids = ["SZ036"]
