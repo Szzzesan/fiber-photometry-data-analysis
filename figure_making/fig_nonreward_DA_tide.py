@@ -120,8 +120,8 @@ def plot_nonreward_traces_in_grid(binned_df, title_suffix=""):
 
     # Setup 4x4 Grid
     cols = 4
-    rows = 4
-    fig, axes = plt.subplots(rows, cols, figsize=(16, 12), constrained_layout=True)
+    rows = 3
+    fig, axes = plt.subplots(rows, cols, figsize=(16, 9), constrained_layout=True)
     axes_flat = axes.flatten()
 
     # Colors
@@ -173,65 +173,94 @@ def plot_nonreward_traces_in_grid(binned_df, title_suffix=""):
     for j in range(i + 1, len(axes_flat)):
         axes_flat[j].axis('off')
 
-    fig.suptitle(f"Non-Reward Traces (0.5s bins): {title_suffix}", fontsize=14)
+    fig.suptitle(f"Non-Reward Traces (0.5s bins) {title_suffix}", fontsize=14)
+    plt.show()
+
+def plot_F0_traces_in_grid(binned_df, title_suffix=""):
+    """
+    Plots a grid for F0 baseline values.
+    """
+    pairs = binned_df[['animal', 'hemisphere']].drop_duplicates().sort_values(['animal', 'hemisphere'])
+    if len(pairs) == 0: return
+
+    cols = 4
+    rows = 3
+    fig, axes = plt.subplots(rows, cols, figsize=(16, 9), constrained_layout=True)
+    axes_flat = axes.flatten()
+
+    color_map = {'0.4': sns.color_palette('Set2')[0], '0.8': sns.color_palette('Set2')[1]}
+
+    # Calculate a dynamic center for the Y-axis based on F0 values
+    center = np.round(binned_df['mean'].median(), 1)
+
+    for i, (idx, row) in enumerate(pairs.iterrows()):
+        if i >= len(axes_flat): break
+        ax = axes_flat[i]
+        animal, hemi = row['animal'], row['hemisphere']
+
+        subset = binned_df[(binned_df['animal'] == animal) & (binned_df['hemisphere'] == hemi)]
+
+        for phase in ['0.4', '0.8']:
+            phase_data = subset[subset['phase'] == phase]
+            if phase_data.empty: continue
+
+            ax.errorbar(
+                x=phase_data['bin_center'], y=phase_data['mean'], yerr=phase_data['sem'],
+                color=color_map[phase], label=f'Block {phase}',
+                fmt='o-', ms=3, capsize=2, elinewidth=1, alpha=0.8
+            )
+
+        ax.set_title(f"{animal} {hemi}", fontsize=9)
+        ax.axhline(0, color='gray', linestyle=':', alpha=0.5)  # Reference line at median
+        ax.set_ylim(center - 0.6, center + 0.6)
+        ax.spines[['top', 'right']].set_visible(False)
+
+        if i >= (rows - 1) * cols: ax.set_xlabel("Time (s)")
+        # Use LaTeX for the subscript '0'
+        if i % cols == 0: ax.set_ylabel("$F_0$ (z)")
+
+        if i == 0: ax.legend(fontsize='x-small')
+
+    for j in range(i + 1, len(axes_flat)): axes_flat[j].axis('off')
+    fig.suptitle(f"$F_0$ Baseline Traces {title_suffix}", fontsize=14)
     plt.show()
 
 def main():
     mpl.rcParams['figure.dpi'] = 300
-    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'nonreward_DA',
-    #                                                             day_0='2023-11-30',
-    #                                                             melt=True,
-    #                                                             hemisphere_qc=1,
-    #                                                             file_format='parquet')
-    #
-    # animal_ids = ["RK007", "RK008"]
-    # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'nonreward_DA',
-    #                                                             day_0='2025-06-17',
-    #                                                             melt=True,
-    #                                                             hemisphere_qc=1,
-    #                                                             file_format='parquet')
-    # nr_df = pd.concat([master_df1, master_df2], ignore_index=True)
-    # if not nr_df.empty:
-    #     # Ensure phase is a string (e.g., '0.4' instead of 0.4) for consistent mapping
-    #     nr_df['phase'] = nr_df['phase'].astype(str)
-    #
-    #     # Rename 'DA' if the loader produced a different column name during melting
-    #     # (The loader you provided names it 'DA' in the stack operation)
-    #
-    #     print("Binning data...")
-    #     binned_df = bin_nonreward_data(nr_df, bin_size=0.5)
-    #
-    #     print("Generating gridded plot...")
-    #     plot_nonreward_traces_in_grid(binned_df, title_suffix="Summary Across Animals")
-    # else:
-    #     print("No data loaded. Please check if 'nonreward_DA.parquet' files exist.")
     all_sessions_pooled = []
+    # tuple_list = [('SZ036', 15), ('SZ037', 25), ('SZ038', 29), ('SZ039', 20), ('SZ042', 20), ('SZ043', 18),
+    #               ('RK007', 19), ('RK008', 11), ('RK009', 14), ('RK010', 13)]
     tuple_list = [('SZ036', 15), ('SZ037', 25), ('SZ038', 29), ('SZ039', 20), ('SZ042', 20), ('SZ043', 18),
-                  ('RK007', 19), ('RK008', 11), ('RK009', 14), ('RK010', 13)]
+                  ('RK007', 19), ('RK008', 11)]
 
     for (ani, total_sessions) in tqdm(tuple_list, desc="Processing All Animals"):
         for s_id in tqdm(range(total_sessions), desc=f"Sessions for {ani}", leave=False):
 
             # Extraction with new exclusion parameters
             # e.g., excluding 0s to 2s post-reward
-            nr_df = reprocess_nonreward_DA_standalone(ani, s_id, excl_start_rel=0, excl_end_rel=2)
+            nr_df = reprocess_nonreward_DA_standalone(ani, s_id, excl_start_rel=0, excl_end_rel=0)
 
             if nr_df is not None and not nr_df.empty:
-                # 1. Melt to get Hemisphere and DA columns
-                data_cols = [c for c in nr_df.columns if 'green' in c]
-                nr_melted = nr_df.melt(
-                    id_vars=['time_in_port', 'phase', 'trial', 'time_recording'],
-                    value_vars=data_cols,
-                    var_name='hemisphere_col',
-                    value_name='DA'
-                )
+                # 1. Identify IDs (columns that stay fixed)
+                id_cols = ['time_in_port', 'phase', 'trial', 'time_recording']
 
-                # 2. Assign Animal and clean Hemisphere string
+                # 2. Use wide_to_long to handle pairs: 'green_left/right' and 'F0_left/right'
+                # We rename columns temporarily so the suffix is consistent (e.g., 'green_left', 'F0_left')
+                # wide_to_long expects: [prefix][stub][suffix]
+                nr_melted = pd.wide_to_long(
+                    nr_df,
+                    stubnames=['green', 'F0'],
+                    i=id_cols,
+                    j='hemisphere',
+                    sep='_',
+                    suffix='\\w+'
+                ).reset_index()
+
+                # 3. Rename 'green' to 'DA' to maintain compatibility with your binning function
+                nr_melted = nr_melted.rename(columns={'green': 'DA'})
                 nr_melted['animal'] = ani
-                nr_melted['hemisphere'] = nr_melted['hemisphere_col'].str.replace('green_', '')
 
-                # 3. Apply your Quality Control selections
+                # 4. Apply Quality Control
                 valid_hemis = qc_selections.get(ani, set())
                 nr_melted = nr_melted[nr_melted['hemisphere'].isin(valid_hemis)].copy()
 
@@ -240,8 +269,10 @@ def main():
     # Combine everything and plot
     if all_sessions_pooled:
         master_nr_df = pd.concat(all_sessions_pooled, ignore_index=True)
-        binned_summary = bin_nonreward_data(master_nr_df, bin_size=0.5)
-        plot_nonreward_traces_in_grid(binned_summary, title_suffix="Adjusted Exclusion [0, 2s]")
+        # binned_DA = bin_nonreward_data(master_nr_df, bin_size=0.5)
+        binned_F0 = bin_nonreward_data(master_nr_df.rename(columns={'DA': 'temp', 'F0': 'DA'}), bin_size=0.5)
+        # plot_nonreward_traces_in_grid(binned_DA, title_suffix="")
+        plot_F0_traces_in_grid(binned_F0, title_suffix="")
 
 if __name__ == '__main__':
     main()
