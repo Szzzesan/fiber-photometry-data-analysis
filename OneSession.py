@@ -1642,9 +1642,9 @@ class OneSession:
 
 
 if __name__ == '__main__':
-    test_session = OneSession('SZ036', 15, include_branch='both', port_swap=0)
+    test_session = OneSession('SZ036', 9, include_branch='both', port_swap=0)
     # test_session.examine_raw(save=0)
-    test_session.calculate_dFF0(plot=0, plot_middle_step=0, save=0)
+    test_session.calculate_dFF0(plot=0, plot_middle_step=1, save=0)
     # test_session.save_dFF0_and_zscore(format='parquet')
     # test_session.remove_outliers_dFF0()
     test_session.process_behavior_data(save=0)

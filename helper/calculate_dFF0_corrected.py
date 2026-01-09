@@ -34,22 +34,22 @@ def calculate_dFF0_corrected(raw_separated, session_label, save_path, plot='Fals
     fps = 40
     F_0_framewindow = F_0_timewindow * fps
     dFF0 = pd.DataFrame(
-        columns=['time_recording', fitted.columns.values[1][:-4], fitted.columns.values[3][:-4]]) # for the end product
+        columns=['time_recording', denoised.columns.values[1][:-4], denoised.columns.values[3][:-4]]) # for the end product
     dFF0.iloc[:, 0] = denoised.iloc[:, 0]
     dFF0_split_channel = denoised.copy()
     F0_split_channel = denoised.copy()
     for i in range(1, 5):
-        F0 = denoised.iloc[:, i].rolling(window=F_0_framewindow, center=True).mean()
-        start_mean = denoised.iloc[:F_0_framewindow, i].mean()
-        end_mean = denoised.iloc[-F_0_framewindow:, i].mean()
+        F0 = fitted.iloc[:, i].rolling(window=F_0_framewindow, center=True).mean()
+        start_mean = fitted.iloc[:F_0_framewindow, i].mean()
+        end_mean = fitted.iloc[-F_0_framewindow:, i].mean()
         half_window = (F_0_framewindow - 1) // 2
         F0.iloc[:half_window] = F0.iloc[:half_window].fillna(start_mean)
         F0.iloc[-half_window:] = F0.iloc[-half_window:].fillna(end_mean)
-        Ft = denoised.iloc[:, i]
+        Ft = fitted.iloc[:, i]
         dF = Ft - F0
         dFF0_split_channel.iloc[:, i] = dF/F0
         F0_split_channel.iloc[:, i] = F0
-
+    # F0_split_channel = lin_reg_fit(F0_split_channel, plot=plot_middle_steps, session_label=session_label)
     dFF0['green_right'] = dFF0_split_channel['green_right_470'] - dFF0_split_channel['green_right_isos']
     dFF0['green_left'] = dFF0_split_channel['green_left_470'] - dFF0_split_channel['green_left_isos']
     dFF0['F0_right'] = F0_split_channel['green_right_470'] - F0_split_channel['green_right_isos']
@@ -57,6 +57,25 @@ def calculate_dFF0_corrected(raw_separated, session_label, save_path, plot='Fals
     # endregion
 
     dFF0.iloc[:, 0] = dFF0.iloc[:, 0].div(1000)
+
+    if plot_middle_steps:
+        df_slice = dFF0_split_channel.loc[24000:25200]
+        x_time = df_slice['time_recording']/1000
+        fig, axes = plt.subplots(2, 1, sharex=True, figsize=[10, 10])
+        axes[0].plot(x_time, df_slice['green_right_470'], label='470 nm')
+        axes[0].plot(x_time, df_slice['green_right_isos'], label='isosbestic')
+        axes[0].set_ylabel("Right Hemisphere\ndF/F0")
+        axes[0].set_xlabel('')
+        axes[0].legend()
+        axes[1].plot(x_time, df_slice['green_left_470'], label='470 nm')
+        axes[1].plot(x_time, df_slice['green_left_isos'], label='isosbestic')
+        axes[1].set_ylabel("Left Hemisphere\ndF/F0")
+        axes[1].set_xlabel("Time (s)")
+        axes[1].legend()
+        plt.show()
+
+
+
 
     if plot:
         plt.style.use('ggplot')
