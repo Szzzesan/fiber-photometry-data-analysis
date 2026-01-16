@@ -77,7 +77,7 @@ def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     draw_vertical_lines(ax, rewards, color='b')
     ax.plot(relative_time, DA_trace_to_plot, color='black')
     # ax.set_xlim([-1, 15])
-    ax.set_xticks(np.arange(0, 15.5, 2.5))
+    # ax.set_xticks(np.arange(0, 15.5, 2.5))
     ax.set_xlabel('Time since Trial Starts (s)')
     ax.set_ylabel('DA (z-score)')
     ax.set_title('Example Trial')
@@ -897,22 +897,30 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
     # add the stats annotation over the boxplots
     group_compared, t_stats, p_values = _paired_t_for_NRI_bins(session_summary_data)
     y_bars = [4.2, 4.6, 4.8, 5.0, 5.5, 5.5, 6.2]
+    y_bar_start = 4.5
+    y_bar_current = y_bar_start
     for center in range(len(p_values)):
         if p_values[center] < 0.0001:
             annot = "****"
+            y_stagger = 0.4
         elif p_values[center] < 0.001:
             annot = "***"
+            y_stagger = 0.3
         elif p_values[center] < 0.01:
             annot = "**"
+            y_stagger = 0.2
         elif p_values[center] < 0.05:
             annot = "*"
+            y_stagger = 0.1
         else:
             annot = 'ns'
+            y_stagger = 0
         x_center1, x_center2 = center, center + 1
         inset = 0.05
         bracket_x1 = x_center1 + inset
         bracket_x2 = x_center2 - inset
-        y, h = y_bars[center], 0.1
+        y_bar_current = y_bar_current + y_stagger
+        y, h = y_bar_current, 0.1
         col = 'k'
         axes.plot([bracket_x1, bracket_x1, bracket_x2, bracket_x2],
                   [y, y + h, y + h, y], lw=1, c=col)
@@ -926,7 +934,7 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
     if dodge:  # then use the default color palette for categorical variable
         animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK008']
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', hue_order=animal_order, size=1,
+                      hue='animal', hue_order=animal_order, size=2,
                       dodge=dodge, legend=False, ax=axes,
                       linewidth=0.5,
                       edgecolor='face')
@@ -934,7 +942,7 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
         animal_order = session_summary_data.groupby('animal')['DA'].mean().sort_values(ascending=False).index
         custom_palette = sns.color_palette("RdYlBu", n_colors=len(animal_order))
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', size=1,
+                      hue='animal', size=2,
                       dodge=dodge, hue_order=animal_order, palette='cmr.guppy',
                       legend=False, ax=axes,
                       linewidth=0.75,
@@ -983,7 +991,7 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
                 showfliers=False, ax=axes)
     # add stats annotation
     group_compared, t_stats, p_values = _paired_t_for_blocks(session_summary_data)
-    y_bars = [4.2, 4.6, 4.8, 5.0, 5.5, 5.5, 6.2, 6.25]
+    y_bars = [4.2, 4.8, 4.8, 5.0, 5.3, 5.5, 5.8, 6.25]
     for center in range(len(p_values)):
         if p_values[center] < 0.0001:
             annot = "****"
@@ -1014,7 +1022,7 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
         (session_summary_data['DA'] > lower_bound) & (session_summary_data['DA'] < upper_bound)]
     # custom_palette = {'0.4': sns.color_palette('colorblind')[0], '0.8': sns.color_palette('colorblind')[3]}
     sns.swarmplot(data=swarm_data, x='cat_code', y='DA', hue='block',
-                  size=1, palette=custom_palette,
+                  size=2, palette=custom_palette,
                   dodge=True, legend=False, ax=axes,
                   linewidth=0.5,
                   edgecolor='face')
@@ -1087,7 +1095,7 @@ def figf_summary_block_split(master_df, axes=None):
                   y='DA',
                   order=['0.4', '0.8'],
                   palette=custom_palette,
-                  size=1,
+                  size=2,
                   legend=False,
                   linewidth=0.5,
                   edgecolor='face',
@@ -1712,7 +1720,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
 
     # # --- Plot example trial 1d ---
     # animal_str = 'SZ036'
@@ -1723,8 +1731,16 @@ if __name__ == '__main__':
     # trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
     #                                               file_format='parquet')
     # figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=None)
-    # for trial in trial_df['trial'].unique():
-    #     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=15, ax=None)
+
+    animal_str = 'SZ036'
+    session_name = '2024-01-08T13_52'
+    zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
+                                                              session_long_name=session_name,
+                                                              file_format='parquet')
+    trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
+                                                  file_format='parquet')
+    for trial in trial_df['trial'].unique():
+        figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=trial, ax=None)
     #
     # # --- Plot example sessions heatmap and average traces ---
     # animal_str = 'SZ036'
