@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import data_loader
@@ -9,6 +10,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.gridspec as gridspec
 from matplotlib.transforms import ScaledTranslation
+
+import config
 
 
 def boxplot_compare_leavetime(trial_df, ax=None):
@@ -183,7 +186,7 @@ def _global_reward_rate(x, bg_stay, travel_bg2exp, travel_exp2bg, cumulative=8.,
 
 def setup_composite_axes():
     # --- 1. Define Figure and Grid Parameters ---
-    fig_size = (18, 6)  # (width, height) in inches
+    fig_size = (12, 4)  # (width, height) in inches
     rows, cols = int(fig_size[1] * 10), int(fig_size[0] * 10)
 
     # --- 2. Define Relative Ratios for Plots and Fixed Pixels for Margins ---
@@ -247,9 +250,9 @@ def setup_composite_axes():
         ax.text(
             0.0, 1.0, lettering[i], transform=(
                     ax.transAxes + ScaledTranslation(-35 / 72, +7 / 72, fig.dpi_scale_trans)),
-            fontsize='large', va='bottom', fontfamily='sans-serif', weight='bold')
+            fontsize=16, va='bottom', weight='bold')
 
-    fig.subplots_adjust(left=0.04, right=0.98, top=0.92, bottom=0.08)
+    # fig.subplots_adjust(left=0.04, right=0.98, top=0.92, bottom=0.08)
     return fig, survival_axes, boxplot_ax
 
 def main():
@@ -294,7 +297,7 @@ def main():
         p_value = results_summary["p"].iloc[0]
         p_text = f'p < 0.001' if p_value < 0.001 else f'p = {p_value:.3f}'
         ax.text(0.95, 0.95, p_text, ha='right', va='top', transform=ax.transAxes)
-        ax.set_title(f'{animal_id}, {sex}')
+        ax.set_title(f'Animal {i+1}, {sex}')
 
         if ax.get_legend():
             ax.get_legend().remove()
@@ -310,10 +313,12 @@ def main():
     fig.supxlabel('Time from Entry (sec)', x=0.45)
     # fig.supylabel('Proportion of Trials Still in Port', x=0.04)
     handles, labels = survival_axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper right', fontsize='small', bbox_to_anchor=(0.22, 0.85))
+    fig.legend(handles, labels, loc='upper right', fontsize='x-small', bbox_to_anchor=(0.3, 0.83))
     fig.tight_layout(rect=[0, 0.03, 1, 0.97])
-
-    plt.savefig("all_animals_block_comparison.png", dpi=300)
+    save_path = os.path.join(config.MAIN_DATA_ROOT, config.THESIS_FIGURE_SUBDIR,
+                             f'fig_3-2_behavior_leave_times_comparison.png')
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.show()
 
 
