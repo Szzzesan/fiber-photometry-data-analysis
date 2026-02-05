@@ -1535,7 +1535,7 @@ def setup_axes_v2():
     #     ax.spines['right'].set_visible(False)
     #     ax.spines['top'].set_visible(False)
 
-    lettering = 'abcdefghijklmnopqrstuvwxyz'
+    lettering = 'ABCDEFGHIJKLMN'
     axes_to_letter = [0, 2, 3, 7, 11, 12, 14]
     for i, ax in enumerate(axes_to_letter):
         axes[ax].text(
