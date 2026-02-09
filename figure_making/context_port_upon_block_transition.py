@@ -436,7 +436,7 @@ def run_batch_quantification(animal_ids):
                 # os.makedirs(save_dir, exist_ok=True)
                 # save_name = f"{animal}_{session_id}_{branch}_DA_integral_vs_trial.png"
                 # plt.savefig(os.path.join(save_dir, save_name))
-                # plt.close(fig)
+                plt.show()
 
 
 def plot_da_integrals_evolution(df):
@@ -546,18 +546,19 @@ def plot_da_integrals_evolution(df):
     plt.tight_layout()
 
     # 6. Save the figure to the thesis directory
-    save_dir = os.path.join(config.MAIN_DATA_ROOT, config.THESIS_FIGURE_SUBDIR)
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, "block_transition_DA_integrals_evolution_ani-hemi.png")
-
-    plt.savefig(save_path, dpi=300)
-    print(f"Successfully saved figure to: {save_path}")
+    # save_dir = os.path.join(config.MAIN_DATA_ROOT, config.THESIS_FIGURE_SUBDIR)
+    # os.makedirs(save_dir, exist_ok=True)
+    # save_path = os.path.join(save_dir, "block_transition_DA_integrals_evolution_ani-hemi.png")
+    #
+    # plt.savefig(save_path, dpi=300)
+    # print(f"Successfully saved figure to: {save_path}")
+    plt.show()
 
 # Run for a specific session
 if __name__ == "__main__":
     # plot_block_transitions("SZ036", "2024-01-11T16_25")
-    #animals = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043", "RK007", "RK008"]
-    # run_batch_transition_analysis(animals)
+    animals = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043", "RK007", "RK008"]
+    run_batch_transition_analysis(animals)
     # process_and_plot_averages(animals)
     # run_batch_quantification(animals)
 
