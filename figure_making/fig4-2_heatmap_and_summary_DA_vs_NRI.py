@@ -83,6 +83,7 @@ def main():
 
     # Bottom Row: Population summary of peak amplitudes binned by NRI
     fig_dopamine.fige_DA_vs_NRI_v2(master_DA_features_df, dodge=True, axes=ax_pop)
+    ax_pop.set_ylim(0.2, 6.8)
 
     # Adding Lettering for thesis formatting
     # lettering = 'abc'

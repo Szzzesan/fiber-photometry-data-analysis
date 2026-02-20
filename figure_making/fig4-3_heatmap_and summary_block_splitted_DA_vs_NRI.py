@@ -87,6 +87,8 @@ def main():
     # Bottom Row: Population summary of peak amplitudes split by block across NRI bins
     fig_dopamine.figf_DA_vs_NRI_block_split_v2(master_DA_features_df, axes=ax_pop)
     fig_dopamine.figf_summary_block_split(master_DA_features_df, axes=ax_summary)
+    ax_pop.set_ylim(0.2, 6.8)
+    ax_summary.set_ylim(0.2, 6.8)
 
     # Standardized lettering for thesis figures
     fig.text(0.1, 0.88, 'a', fontsize=16, weight='bold', va='bottom')

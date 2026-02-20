@@ -140,7 +140,7 @@ def fige_DA_vs_IRI_binned(master_df, axes=None):
             axes.plot([x1, x1, x2, x2], [y, y + h, y + h, y], lw=1, c='black')
             axes.text((x1 + x2) * 0.5, y + h, sig, ha='center', va='bottom', color='black', fontsize=10)
 
-    axes.set_yticks([1, 2, 3, 4, 5])
+    axes.set_yticks([1, 2, 3, 4, 5, 6])
     axes.set_xlabel('Inter-Reward Interval (s)')
     axes.set_ylabel('DA Peak Amplitude')
     axes.spines[['top', 'right']].set_visible(False)
@@ -255,11 +255,12 @@ def main():
 
     # Process and Plot Heatmap Group
     t_vec, codes, labels, mat = resample_data_for_IRI_heatmap(z_heat, f'green_{hemi}', r_heat)
-    fig_dopamine.plot_heatmap_and_mean_traces(t_vec, codes, labels, mat, palette='Blues_r',
+    fig_dopamine.plot_heatmap_and_mean_traces(t_vec, codes, labels, mat, palette='Reds_r',
                                               axes=axes_heat, legend_title='IRI (s)')
 
     # Plot Population Box Plot
     fige_DA_vs_IRI_binned(master_df, axes=ax_pop)
+    ax_pop.set_ylim(0.2, 6.8)
 
     # Lettering
     fig.text(0.1, 0.88, 'a', fontsize=16, weight='bold', va='bottom')
