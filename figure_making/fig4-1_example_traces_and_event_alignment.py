@@ -384,7 +384,7 @@ def plot_violin_on_axis(master_df, ax):
                     fontsize=12, fontweight='bold', color='darkslategray')
 
     ax.set_ylabel('Event-to-Peak Interval (s)')
-    ax.set_title('Dopamine Event-to-Peak Alignment', pad=8)
+    ax.set_title('Event-to-Dopamine-Peak Alignment', pad=8)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
