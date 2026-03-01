@@ -68,6 +68,7 @@ def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     else:
         fig = None
         return_handle = False
+        ax.set_title('Example Trial')
     ax.axvspan(0, bg_exit, ymin=0.89, ymax=1, facecolor='skyblue', alpha=0.6, edgecolor='none', label='Context Port')
     ax.axvspan(exp_entry, exp_exit, ymin=0.89, ymax=1, facecolor='lightcoral', alpha=0.6, edgecolor='none',
                label='Investment Port')
@@ -80,7 +81,6 @@ def figa_example_trial_1d_traces(zscore, trial_df, example_trial_id, ax=None):
     # ax.set_xticks(np.arange(0, 15.5, 2.5))
     ax.set_xlabel('Time since Trial Starts (s)')
     ax.set_ylabel('DA (z-score)')
-    ax.set_title('Example Trial')
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     plt.tight_layout()
@@ -1720,7 +1720,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
 
     # # --- Plot example trial 1d ---
     # animal_str = 'SZ036'
@@ -1732,16 +1732,16 @@ if __name__ == '__main__':
     #                                               file_format='parquet')
     # figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=None)
 
-    # animal_str = 'SZ036'
-    # session_name = '2024-01-08T13_52'
-    # zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
-    #                                                           session_long_name=session_name,
-    #                                                           file_format='parquet')
-    # trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
-    #                                               file_format='parquet')
-    # for trial in trial_df['trial'].unique():
-    #     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=trial, ax=None)
-    #
+    animal_str = 'SZ039' # 'SZ036'
+    session_name = "2023-12-30T20_44" # '2024-01-08T13_52'
+    zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
+                                                              session_long_name=session_name,
+                                                              file_format='parquet')
+    trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
+                                                  file_format='parquet')
+    for trial in trial_df['trial'].unique():
+        figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=trial, ax=None)
+
     # # --- Plot example sessions heatmap and average traces ---
     # animal_str = 'SZ036'
     # session_name = '2023-12-30T19_57'
