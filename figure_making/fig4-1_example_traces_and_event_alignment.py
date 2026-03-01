@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from matplotlib.transforms import ScaledTranslation
+import matplotlib.image as mpimg
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 
@@ -334,23 +335,26 @@ def setup_thesis_grid_v2(dur1, dur2):
     Modified to have example traces on top and a full-width violin plot
     on the bottom row.
     """
-    fig = plt.figure(figsize=(12, 12))
+    fig = plt.figure(figsize=(12, 10))
     num_cols = 100
-    gs = gridspec.GridSpec(20, num_cols, figure=fig)
+    gs = gridspec.GridSpec(17, num_cols, figure=fig)
 
     max_dur = max(dur1, dur2)
     split_col = int(num_cols * (dur1 / max_dur))
+    first_col_remains = num_cols - split_col
+    legend_width = int((first_col_remains - 8) / 3)
 
     # Top Row: Example Traces
     ax_t1 = fig.add_subplot(gs[0:3, :split_col])
     ax_t2 = fig.add_subplot(gs[4:7, :])
-    ax_leg = fig.add_subplot(gs[0:3, split_col+10 : split_col+20])
+    ax_leg = fig.add_subplot(gs[0:3, split_col+3 : split_col+3+legend_width])
     ax_leg.axis('off')
+    ax_histology = fig.add_subplot(gs[0:3, split_col+8+legend_width:])
 
     # Bottom Row: Single full-width subplot for Violin Plot
-    ax_violin = fig.add_subplot(gs[10:19, :])
+    ax_violin = fig.add_subplot(gs[9:17, :])
 
-    return fig, [ax_t1, ax_t2, ax_leg], ax_violin
+    return fig, [ax_t1, ax_t2, ax_leg], ax_histology, ax_violin
 
 # --- Modified Violin Plot Function to accept an axis ---
 def plot_violin_on_axis(master_df, ax):
@@ -379,49 +383,96 @@ def plot_violin_on_axis(master_df, ax):
             ax.text(i + 0.1, y_max + 0.05, f"$\sigma = {std_val:.3f}$",
                     fontsize=12, fontweight='bold', color='darkslategray')
 
-    ax.set_ylabel('Peak - Event Interval (s)')
-    ax.set_title('Dopamine Peak-to-Event Alignment', pad=15)
+    ax.set_ylabel('Event-to-Peak Interval (s)')
+    ax.set_title('Dopamine Event-to-Peak Alignment', pad=8)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
+
+def figb_histology(title, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(3, 2))
+        return_handle = True
+    else:
+        fig = None
+        return_handle = False
+    img = mpimg.imread(title)
+    ax.imshow(img)
+    ax.axis("off")
+    if return_handle:
+        fig.tight_layout()
+        fig.show()
+        return fig, ax
+
 def main():
-    # 0. Load Data
-    animal_trace = 'SZ036'
-    session_trace = '2024-01-08T13_52'
-    animal_heat = 'SZ043'
-    session_heat = '2023-12-24T15_54'
-    hemi = 'left'
-    branch = f'green_{hemi}'
+    # 0. Load Data for Example Traces
+    # Define parameters for each example trial (can be different animals/sessions)
+    example_configs = [
+        {
+            'animal': 'SZ036',
+            'session': '2024-01-08T13_52',
+            'trial_id': 32,
+        },
+        {
+            'animal': 'SZ039',
+            'session': '2023-12-30T20_44',
+            'trial_id': 20,
+        }
+    ]
 
-    zscore_trace = data_loader.load_session_dataframe(animal_trace, 'zscore', session_long_name=session_trace)
-    trial_df_trace = data_loader.load_session_dataframe(animal_trace, 'trial_df', session_long_name=session_trace)
+    plot_data_list = []
+    for cfg in example_configs:
+        # Load session-specific dataframes
+        zscore = data_loader.load_session_dataframe(cfg['animal'], 'zscore', session_long_name=cfg['session'])
+        trial_df = data_loader.load_session_dataframe(cfg['animal'], 'trial_df', session_long_name=cfg['session'])
 
-    zscore_heat = data_loader.load_session_dataframe(animal_heat, 'zscore', session_long_name=session_heat)
-    reward_df = data_loader.load_session_dataframe(animal_heat, 'expreward_df', session_long_name=session_heat)
-    trial_df_heat = data_loader.load_session_dataframe(animal_heat, 'trial_df', session_long_name=session_heat)
+        # Calculate duration for this specific trial
+        # (Assuming get_trial_duration is defined in your environment)
+        dur = get_trial_duration(trial_df, cfg['trial_id'])
+
+        plot_data_list.append({
+            'zscore': zscore,
+            'trial_df': trial_df,
+            'trial_id': cfg['trial_id'],
+            'duration': dur,
+            'animal': cfg['animal'],
+            'session': cfg['session']
+        })
 
     # 1. Get trial durations and setup grid
-    t1_id, t2_id = 32, 19
-    dur1 = get_trial_duration(trial_df_trace, t1_id)
-    dur2 = get_trial_duration(trial_df_trace, t2_id)
-    # fig, top_axes, h1_axes, h2_axes = setup_thesis_grid(dur1, dur2)
-    fig, top_axes, ax_violin = setup_thesis_grid_v2(dur1, dur2)
+    dur1 = plot_data_list[0]['duration']
+    dur2 = plot_data_list[1]['duration']
+    fig, top_axes, ax_hist, ax_violin = setup_thesis_grid_v2(dur1, dur2)
 
     # 2. Plot traces with manual x-limits (No sharex)
-    for i, (ax, tid, dur) in enumerate(zip(top_axes[:2], [t1_id, t2_id], [dur1, dur2])):
-        fig_dopamine.figa_example_trial_1d_traces(zscore_trace, trial_df_trace, tid, ax=ax)
-        ax.set_xlim(0, dur)
+    for i, (ax, data) in enumerate(zip(top_axes[:2], plot_data_list)):
+        # Extract trial-specific data
+        zs = data['zscore']
+        tdf = data['trial_df']
+        tid = data['trial_id']
+        dur = data['duration']
 
-        # Customize Titles and Ticks
-        ax.set_title(f'Example Trial {i + 1}')
+        # Plot using the provided function
+        fig_dopamine.figa_example_trial_1d_traces(zs, tdf, tid, ax=ax)
+
+        # Customize individual subplot
+        ax.set_xlim(0, dur)
+        ax.set_title(f"Example Trial {i + 1}")
+
+        # Formatting ticks
         ticks = np.arange(0, dur + 0.1, 2.5)
         ax.set_xticks(ticks)
         ax.set_xticklabels([f'{t:g}' for t in ticks])
         ax.tick_params(labelbottom=True)
-        if i == 1: ax.set_xlabel('Time since Trial Starts (s)')
-        if i < 1: ax.set_xlabel('')
+
+        # Labeling
+        if i == 1:
+            ax.set_xlabel('Time since Trial Starts (s)')
+        else:
+            ax.set_xlabel('')
 
     fig_dopamine.figa_example_trial_legend(ax=top_axes[2])
+    figb_histology('merged_histology.png', ax=ax_hist)
 
 
     # # 4. Process Heatmap Group 1: Reward Aligned, Chronological
@@ -455,7 +506,7 @@ def main():
 
     # Formatting
     lettering = 'abcde'
-    for i, ax in enumerate([top_axes[0], ax_violin]):
+    for i, ax in enumerate([top_axes[0], ax_hist, ax_violin]):
         ax.text(-0.05, 1.0, lettering[i], transform=ax.transAxes, fontsize=16, fontweight='bold', va='bottom')
 
     # Save
