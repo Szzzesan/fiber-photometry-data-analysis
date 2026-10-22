@@ -934,7 +934,7 @@ def fige_DA_vs_NRI_v2(master_df, dodge=True, axes=None):
     if dodge:  # then use the default color palette for categorical variable
         animal_order = ['SZ036', 'SZ037', 'SZ038', 'SZ039', 'SZ042', 'SZ043', 'RK007', 'RK008']
         sns.swarmplot(data=session_summary_data, x='cat_code', y='DA',
-                      hue='animal', hue_order=animal_order, size=2,
+                      hue='animal', hue_order=animal_order, size=1,
                       dodge=dodge, legend=False, ax=axes,
                       linewidth=0.5,
                       edgecolor='face')
@@ -1022,7 +1022,7 @@ def figf_DA_vs_NRI_block_split_v2(master_df, axes=None):
         (session_summary_data['DA'] > lower_bound) & (session_summary_data['DA'] < upper_bound)]
     # custom_palette = {'0.4': sns.color_palette('colorblind')[0], '0.8': sns.color_palette('colorblind')[3]}
     sns.swarmplot(data=swarm_data, x='cat_code', y='DA', hue='block',
-                  size=2, palette=custom_palette,
+                  size=1, palette=custom_palette,
                   dodge=True, legend=False, ax=axes,
                   linewidth=0.5,
                   edgecolor='face')
@@ -1095,7 +1095,7 @@ def figf_summary_block_split(master_df, axes=None):
                   y='DA',
                   order=['0.4', '0.8'],
                   palette=custom_palette,
-                  size=2,
+                  size=1,
                   legend=False,
                   linewidth=0.5,
                   edgecolor='face',
@@ -1150,6 +1150,8 @@ def figg_DA_vs_IRI_v2(master_df, IRI_group_size=50, axes=None):
     # axes.set_ylim([1.6, 4.1])
     # axes.set_title('DA vs. IRI Split by NRI Groups')
     axes.set_xlabel('Reward Time from Prior Reward (s)')
+    axes.set_xlim(left=1)
+    axes.set_ylim(bottom=2.25)
     axes.set_ylabel('Peak Amplitude', y=0.3)
     axes.spines['top'].set_visible(False)
     axes.spines['right'].set_visible(False)
@@ -1720,7 +1722,7 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
+    main()
 
     # # --- Plot example trial 1d ---
     # animal_str = 'SZ036'
@@ -1732,15 +1734,15 @@ if __name__ == '__main__':
     #                                               file_format='parquet')
     # figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=32, ax=None)
 
-    animal_str = 'SZ039' # 'SZ036'
-    session_name = "2023-12-30T20_44" # '2024-01-08T13_52'
-    zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
-                                                              session_long_name=session_name,
-                                                              file_format='parquet')
-    trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
-                                                  file_format='parquet')
-    for trial in trial_df['trial'].unique():
-        figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=trial, ax=None)
+    # animal_str = 'SZ039' # 'SZ036'
+    # session_name = "2023-12-30T20_44" # '2024-01-08T13_52'
+    # zscore_example_trial = data_loader.load_session_dataframe(animal_str, 'zscore',
+    #                                                           session_long_name=session_name,
+    #                                                           file_format='parquet')
+    # trial_df = data_loader.load_session_dataframe(animal_str, 'trial_df', session_long_name=session_name,
+    #                                               file_format='parquet')
+    # for trial in trial_df['trial'].unique():
+    #     figa_example_trial_1d_traces(zscore_example_trial, trial_df, example_trial_id=trial, ax=None)
 
     # # --- Plot example sessions heatmap and average traces ---
     # animal_str = 'SZ036'
@@ -1773,14 +1775,14 @@ if __name__ == '__main__':
     # # figg_DA_vs_IRI_v2(master_DA_features_df, IRI_group_size=450, axes=None)
 
     ## --- Plot DA amplitudes vs. reward probability ---
-    # animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
-    # # animal_ids=["SZ036"]
-    # master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-    #                                                                        day_0='2023-11-30', file_format='parquet')
-    # animal_ids = ["RK007", "RK008"]
-    # master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
-    #                                                                        day_0='2025-06-17', file_format='parquet')
-    # master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
+    animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
+    # animal_ids=["SZ036"]
+    master_df1 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+                                                                           day_0='2023-11-30', file_format='parquet')
+    animal_ids = ["RK007", "RK008"]
+    master_df2 = data_loader.load_dataframes_for_animal_summary(animal_ids, 'DA_vs_features',
+                                                                           day_0='2025-06-17', file_format='parquet')
+    master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
     # figf_DA_vs_reward_prob(master_DA_features_df, axes=None)
 
     # --- Plot heatmaps from every single session ---
