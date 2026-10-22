@@ -82,6 +82,50 @@ def _draw_bracket(ax, x1, x2, y, h, annot, inset=0.05, col='k'):
     ax.text((bx1 + bx2) * 0.5, y + h / 2, annot, ha='center', va='bottom', color=col, fontsize=10)
 
 
+def legend_right_of_curves(ax, vertical='upper', pad=0.03, x_right=None, **legend_kws):
+    """
+    Put the legend in the empty space to the right of where the curves end (as in the reference
+    Figure 1), extending the x-axis when needed so the legend never overlaps the data.
+    x_right: if given, the legend's right border is aligned with this x value (in data units) and
+    the x-axis is extended to at least x_right; otherwise the legend's left border sits just after
+    the curves end.
+    Returns the (possibly extended) right x-limit.
+    """
+    if x_right is not None and ax.get_xlim()[1] < x_right:
+        ax.set_xlim(ax.get_xlim()[0], x_right)
+    x_min, x_max = ax.get_xlim()
+    curve_end = max(np.nanmax(line.get_xdata()) for line in ax.get_lines() if len(line.get_xdata()))
+
+    # measure the legend width (in axes fraction) by drawing it once
+    legend = ax.legend(loc='upper left', **legend_kws)
+    renderer = ax.figure.canvas.get_renderer()
+    legend_frac = legend.get_window_extent(renderer).width / ax.get_window_extent(renderer).width
+    legend.remove()
+
+    # widen the x-axis if the curves leave too little room for the legend
+    end_frac = (curve_end - x_min) / (x_max - x_min)
+    if x_right is None and end_frac + pad + legend_frac > 1:
+        x_max = x_min + (curve_end - x_min) / (1 - pad - legend_frac)
+        x_max = np.ceil(x_max / 2) * 2  # round up to an even number of seconds
+        ax.set_xlim(x_min, x_max)
+        end_frac = (curve_end - x_min) / (x_max - x_min)
+
+    y_anchor = {'upper': 1.0, 'center': 0.5, 'lower': 0.0}[vertical]
+    if x_right is None:
+        legend = ax.legend(loc=f'{vertical} left' if vertical != 'center' else 'center left',
+                           bbox_to_anchor=(end_frac + pad, y_anchor), borderaxespad=0, **legend_kws)
+    else:
+        right_frac = (x_right - x_min) / (x_max - x_min)
+        # flag (don't print yet): the panel may still be resized by the v2 layout; main() reports at the end
+        ax._legend_overlaps = right_frac - legend_frac < end_frac + pad
+        legend = ax.legend(loc=f'{vertical} right' if vertical != 'center' else 'center right',
+                           bbox_to_anchor=(right_frac, y_anchor), borderaxespad=0, **legend_kws)
+    legend.get_title().set_multialignment('center')  # centre each line of a multi-line title
+    # remember the settings so the legend can be re-placed if the axes are resized later
+    ax._legend_right_kws = dict(vertical=vertical, pad=pad, x_right=x_right, **legend_kws)
+    return x_max
+
+
 # --- data preparation (cached, because the SVM fits are slow) ---
 def _cache_path(name):
     return os.path.join(config.MAIN_DATA_ROOT, config.PAPER_OUTPUT_SUBDIR, name)
@@ -275,16 +319,15 @@ def figb_survival_from_entry(trial_df, axes=None):
     out = plot_survival(trial_df, 'time_from_entry', 'context', BLOCK_VALUES, BLOCK_COLORS, BLOCK_LABELS,
                         max_x=20, axes=axes)
     ax = axes if axes is not None else out[1]
-    # arrows at the MVT-optimal exit times (see panel H), as in the reference figure
+    # dashed lines at the MVT-optimal exit times, drawn the same way as in panel H
     for block, t_opt in mvt_optimal_exit_times().items():
         color = COLOR_LOW if block == 0.4 else COLOR_HIGH
-        ax.annotate('', xy=(t_opt, 1.0), xytext=(t_opt, 1.12),
-                    xycoords=('data', 'axes fraction'), textcoords=('data', 'axes fraction'),
-                    arrowprops=dict(arrowstyle='-|>', color=color, lw=1, shrinkA=0, shrinkB=0),
-                    annotation_clip=False)
+        ax.axvline(x=t_opt, color=color, linestyle='--', lw=1)
     ax.set_xlabel('Time from Entry (s)')
-    ax.legend(title='Context\nReward Rate', title_fontsize='x-small', fontsize='x-small', frameon=False,
-              loc='lower left')
+    # block legend is shown once, here on the first panel where the blocks appear
+    legend = ax.legend(title='Context\nReward Rate', title_fontsize='small', fontsize='medium', frameon=True,
+                       edgecolor='lightgrey', fancybox=False, loc='upper right')
+    legend.get_title().set_multialignment('center')
     return out
 
 
@@ -293,8 +336,7 @@ def figc_hazard_from_entry(trial_df, min_at_risk=5, axes=None):
                                max_x=20, min_at_risk=min_at_risk, axes=axes)
     ax = axes if axes is not None else out[1]
     ax.set_xlabel('Time from Entry (s)')
-    ax.legend(title='Context\nReward Rate', title_fontsize='x-small', fontsize='x-small', frameon=False,
-              loc='upper left')
+    # block legend is shown once, on the survival-from-entry panel
     return out
 
 
@@ -315,7 +357,8 @@ def fige_hazard_from_reward_by_block(reward_df, min_at_risk=5, axes=None):
     return out
 
 
-def figf_hazard_from_reward_by_entry_time(reward_df, bins=(0, 3, 6, 9, 12), min_at_risk=5, axes=None):
+def figf_hazard_from_reward_by_entry_time(reward_df, bins=(0, 3, 6, 9, 12), min_at_risk=5, legend_x_right=20,
+                                          axes=None):
     df = reward_df.copy()
     bin_labels = [f'{bins[i]}-{bins[i + 1]}' for i in range(len(bins) - 1)]
     df['entry_bin'] = pd.cut(df['time_from_entry_at_reward'], bins=list(bins), labels=bin_labels)
@@ -325,8 +368,11 @@ def figf_hazard_from_reward_by_entry_time(reward_df, bins=(0, 3, 6, 9, 12), min_
     ax = axes if axes is not None else out[1]
     ax.set_xlabel('Time from Reward (s)')
     ax.set_ylabel('')
-    ax.legend(title='Reward Time\nfrom Entry (s)', title_fontsize='x-small', fontsize='x-small', frameon=False,
-              loc='upper left')
+    # legend sits in the empty space to the right of the curves; latest reward times on top, as in the reference
+    handles, labels = ax.get_legend_handles_labels()
+    legend_right_of_curves(ax, vertical='upper', x_right=legend_x_right, handles=handles[::-1], labels=labels[::-1],
+                           title='Reward Time\nfrom Entry (s)', title_fontsize='small', fontsize='medium',
+                           frameon=True, edgecolor='lightgrey', fancybox=False)
     return out
 
 
@@ -404,7 +450,7 @@ def figh_mvt_optimality(axes=None):
     axes.set_ylim(0, 1.05)
     axes.set_xlabel('Time from Entry (s)')
     axes.set_ylabel('Reward Rate (rewards/s)')
-    axes.legend(fontsize='x-small', frameon=False, loc='upper right', labelspacing=0.2, handlelength=1.0)
+    axes.legend(fontsize='medium', frameon=True, edgecolor='lightgrey', fancybox=False, loc='upper right', labelspacing=0.2, handlelength=1.0)
     axes.spines['top'].set_visible(False)
     axes.spines['right'].set_visible(False)
 
@@ -415,8 +461,8 @@ def figh_mvt_optimality(axes=None):
 
 
 # --- axes layout ---
-def setup_axes_v2():
-    fig_size = (10, 12)  # (width, height) in inches
+def setup_axes_v1():
+    fig_size = (9, 12)  # (width, height) in inches
     rows, cols = fig_size[1] * 10, fig_size[0] * 10
 
     # horizontal splits for each figure row (relative widths) and the margins between panels
@@ -466,12 +512,111 @@ def setup_axes_v2():
             0.0, 1.0, lettering[i], transform=(
                     axes[ax].transAxes + ScaledTranslation(-20 / 72, +7 / 72, fig.dpi_scale_trans)),
             fontsize='large', va='bottom', fontfamily='sans-serif', weight='bold')
-    fig.subplots_adjust(left=0.08, right=0.98, top=0.97, bottom=0.05)
+    fig.subplots_adjust(left=0.10, right=0.98, top=0.97, bottom=0.05)
     axes = np.array(axes)
     return axes
 
 
-def main(recompute=False, save_fig=False):
+def setup_axes_v2():
+    """
+    Row 2: survival curves (B from entry, C from reward). Row 3: hazard curves (D from entry,
+    E from reward by block, F from reward by entry time). Panel widths in rows 2 and 3 are set
+    after plotting by match_time_scale(), so equal lengths on the x-axis mean equal time.
+    Axes are returned in the same order as setup_axes_v1 (i.e. by plotting function), so main()
+    works with either layout:
+        [A, surv. from entry, hazard from entry, surv. from reward, hazard by block, hazard by entry, G, H]
+    """
+    fig_size = (9, 12)  # (width, height) in inches
+    rows, cols = fig_size[1] * 10, fig_size[0] * 10
+
+    # starting widths ~ the x range in seconds; refined in match_time_scale()
+    row_2 = [20, 10]  # B survival from entry, C survival from reward
+    row_3 = [20, 10, 10]  # D hazard from entry, E hazard by block, F hazard by entry time
+    row_4 = [1, 1]  # G SVM coefficients, H MVT optimality
+    row_2_margins = [10]
+    row_3_margins = [10, 6]
+    row_4_margins = [14]
+
+    col_1 = [4, 2.5, 2.5, 3]
+    col_1_margins = [9, 11, 11]
+
+    def _splits(widths, margins, total):
+        sizes = [int((total - np.sum(margins)) * w / sum(widths)) for w in widths]
+        edges = np.cumsum([val for pair in zip(sizes, list(margins) + [0]) for val in pair][:-1])
+        edges[-1] = total
+        return np.insert(edges, 0, 0)
+
+    r2 = _splits(row_2, row_2_margins, cols)
+    r3 = _splits(row_3, row_3_margins, cols)
+    r4 = _splits(row_4, row_4_margins, cols)
+    c1 = _splits(col_1, col_1_margins, rows)
+
+    fig = plt.figure(figsize=fig_size)
+    gs = gridspec.GridSpec(rows, cols, figure=fig)
+    ax_a = fig.add_subplot(gs[c1[0]:c1[1], :])  # A task schematic
+    ax_b = fig.add_subplot(gs[c1[2]:c1[3], r2[0]:r2[1]])  # B survival vs. time from entry
+    ax_c = fig.add_subplot(gs[c1[2]:c1[3], r2[2]:r2[3]])  # C survival vs. time from reward
+    ax_d = fig.add_subplot(gs[c1[4]:c1[5], r3[0]:r3[1]])  # D hazard vs. time from entry
+    ax_e = fig.add_subplot(gs[c1[4]:c1[5], r3[2]:r3[3]])  # E hazard vs. time from reward, by block
+    ax_f = fig.add_subplot(gs[c1[4]:c1[5], r3[4]:r3[5]])  # F hazard vs. time from reward, by entry time
+    ax_g = fig.add_subplot(gs[c1[6]:c1[7], r4[0]:r4[1]])  # G SVM coefficients
+    ax_h = fig.add_subplot(gs[c1[6]:c1[7], r4[2]:r4[3]])  # H MVT optimality
+
+    lettering = 'ABCDEFGHIJKLMN'
+    for i, ax in enumerate([ax_a, ax_b, ax_c, ax_d, ax_e, ax_f, ax_g, ax_h]):
+        ax.text(
+            0.0, 1.0, lettering[i], transform=(
+                    ax.transAxes + ScaledTranslation(-20 / 72, +7 / 72, fig.dpi_scale_trans)),
+            fontsize='large', va='bottom', fontfamily='sans-serif', weight='bold')
+    fig.subplots_adjust(left=0.10, right=0.98, top=0.97, bottom=0.05)
+
+    # same order as setup_axes_v1 so the plotting calls in main() don't change
+    axes = np.array([ax_a, ax_b, ax_d, ax_c, ax_e, ax_f, ax_g, ax_h])
+    time_scaled_rows = [[ax_b, ax_c], [ax_d, ax_e, ax_f]]
+    return axes, time_scaled_rows
+
+
+def match_time_scale(row_axes):
+    """
+    Resize the panels of one figure row so their widths are proportional to their x ranges
+    (same seconds per inch), keeping the row's outer edges and the gaps between panels.
+    """
+    pos = [ax.get_position() for ax in row_axes]
+    gaps = [pos[i + 1].x0 - pos[i].x1 for i in range(len(pos) - 1)]
+    spans = [np.diff(ax.get_xlim())[0] for ax in row_axes]
+    unit = (pos[-1].x1 - pos[0].x0 - sum(gaps)) / sum(spans)  # figure fraction per second
+    x0 = pos[0].x0
+    for ax, p, span, gap in zip(row_axes, pos, spans, gaps + [0]):
+        ax.set_position([x0, p.y0, span * unit, p.height])
+        x0 += span * unit + gap
+
+
+def apply_time_scale(time_scaled_rows, sync_pairs=(), n_iter=4):
+    """
+    Iterate: rescale panel widths -> re-place legends that sit right of the curves (their
+    width in axes units changed, so the x-axis may need extending) -> re-sync shared x-axes.
+    Stops once the x limits no longer change.
+    """
+    fig = time_scaled_rows[0][0].figure
+    for _ in range(n_iter):
+        before = [ax.get_xlim() for row in time_scaled_rows for ax in row]
+        for row in time_scaled_rows:
+            match_time_scale(row)
+        fig.canvas.draw()  # update the renderer with the new axes sizes
+        for row in time_scaled_rows:
+            for ax in row:
+                kws = getattr(ax, '_legend_right_kws', None)
+                if kws is not None:
+                    legend_right_of_curves(ax, **kws)
+        for follower, leader in sync_pairs:
+            follower.set_xlim(leader.get_xlim())
+        if before == [ax.get_xlim() for row in time_scaled_rows for ax in row]:
+            break
+    for row in time_scaled_rows:
+        match_time_scale(row)
+
+
+def main(recompute=False, save_fig=False, layout='v2'):
     # --- data preparation ---
     animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043", "RK007", "RK008"]
 
@@ -488,11 +633,14 @@ def main(recompute=False, save_fig=False):
     # --- end of data preparation ---
 
     # --- set up axes and add figures to axes ---
-    axes = setup_axes_v2()
+    if layout == 'v1':
+        axes, time_scaled_rows = setup_axes_v1(), None
+    else:
+        axes, time_scaled_rows = setup_axes_v2()
 
     figa_task_schematic(schematic_path, ax=axes[0])
     figb_survival_from_entry(trial_df, axes=axes[1])
-    figc_hazard_from_entry(trial_df, min_at_risk=30, axes=axes[2])
+    figc_hazard_from_entry(trial_df, min_at_risk=40, axes=axes[2])
     figd_survival_from_reward(reward_df, axes=axes[3])
     fige_hazard_from_reward_by_block(reward_df, min_at_risk=30, axes=axes[4])
     figf_hazard_from_reward_by_entry_time(reward_df, min_at_risk=30, axes=axes[5])
@@ -504,13 +652,25 @@ def main(recompute=False, save_fig=False):
     for ax in axes[4:6]:
         ax.set_ylim(0, y_max)
 
+    if time_scaled_rows is None:
+        # v1: F's x-axis may have been widened to fit its legend, so E follows it
+        axes[4].set_xlim(axes[5].get_xlim())
+    else:
+        # v2: equal seconds per inch within rows 2 and 3, which already makes E and F comparable,
+        # so E keeps its own x range instead of inheriting the space F needs for its legend
+        apply_time_scale(time_scaled_rows)
+
+    for ax in axes:
+        if getattr(ax, '_legend_overlaps', False):
+            print('Warning: a right-aligned legend overlaps its curves; increase legend_x_right for that panel.')
+
     if save_fig:
         out_dir = os.path.join(config.MAIN_DATA_ROOT, config.PAPER_OUTPUT_SUBDIR)
-        plt.savefig(os.path.join(out_dir, 'elife_fig1.png'), dpi=300)
-        plt.savefig(os.path.join(out_dir, 'elife_fig1.pdf'))
+        plt.savefig(os.path.join(out_dir, 'elife_fig1_v2.png'), dpi=300)
+        plt.savefig(os.path.join(out_dir, 'elife_fig1_v2.pdf'))
     plt.show()
     # --- end of adding figures to axes
 
 
 if __name__ == '__main__':
-    main(recompute=False, save_fig=False)
+    main(recompute=False, save_fig=True)
