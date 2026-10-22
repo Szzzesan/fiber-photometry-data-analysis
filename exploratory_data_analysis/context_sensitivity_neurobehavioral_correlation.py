@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 from scipy.stats import spearmanr
+import statsmodels.formula.api as smf
 from lifelines.statistics import logrank_test  # Ensure lifelines is installed
 
 import config
@@ -14,6 +15,159 @@ sns.set_context("talk")
 sns.set_style("white")
 colors = sns.color_palette('Set2')  # Set2[0] = Low (0.4), Set2[1] = High (0.8)
 
+
+def run_lmem_analysis(df, x_col='diff_neural', y_col='diff_behavior', group_col='animal'):
+    """
+    Runs a Linear Mixed-Effects Model (LMEM) predicting y_col from x_col,
+    with random intercepts and random slopes for the grouping variable (animal).
+
+    Args:
+        df: DataFrame containing the session-level data.
+        x_col: The independent variable (e.g., difference in DA).
+        y_col: The dependent variable (e.g., difference in behavior).
+        group_col: The grouping variable for random effects (e.g., animal).
+
+    Returns:
+        The fitted LMEM results object.
+    """
+    # Drop missing values to ensure the model converges properly
+    df_clean = df.dropna(subset=[x_col, y_col, group_col]).copy()
+
+    if df_clean.empty:
+        print("Data is empty after dropping NaNs. Cannot run LMEM.")
+        return None
+
+    print(f"\n--- Running LMEM: {y_col} ~ {x_col} ---")
+    print(f"Random effects: Intercept and slope grouped by '{group_col}'")
+
+    # Formula explanation:
+    # "y ~ x": Fixed effect of x on y
+    # groups: specifies the random effect groups (animals)
+    # re_formula="~x": specifies that the slope of 'x' is also a random effect alongside the intercept
+    formula = f"{y_col} ~ {x_col}"
+
+    try:
+        model = smf.mixedlm(formula, df_clean, groups=df_clean[group_col], re_formula=f"~{x_col}")
+        result = model.fit()
+        print(result.summary())
+        return result
+    except Exception as e:
+        print(f"LMEM fitting failed: {e}")
+        return None
+
+
+def get_individual_lmem_coefs(lmem_result, x_col='diff_neural'):
+    """
+        Extracts the individual slopes, intercepts, and their Standard Errors (SE)
+        for each group (animal) from a fitted statsmodels mixedlm result.
+        """
+    if lmem_result is None:
+        print("No LMEM result provided.")
+        return None
+
+    # 1. Get the Fixed Effects and their variances (Population average)
+    fixed_intercept = lmem_result.params['Intercept']
+    fixed_slope = lmem_result.params[x_col]
+
+    fixed_intercept_var = lmem_result.bse['Intercept'] ** 2
+    fixed_slope_var = lmem_result.bse[x_col] ** 2
+
+    # 2. Get the Random Effects (Individual deviations)
+    re_df = pd.DataFrame(lmem_result.random_effects).T
+    re_cov_dict = lmem_result.random_effects_cov  # Covariance matrices for each animal
+
+    # Statsmodels naming conventions for random effects columns
+    re_intercept_col = 'Group' if 'Group' in re_df.columns else 'Intercept'
+    re_slope_col = x_col if x_col in re_df.columns else f"{x_col}[T.True]"
+
+    # 3. Calculate final coefficients and Standard Errors
+    results_list = []
+
+    for animal_id, cov_matrix in re_cov_dict.items():
+        # Get individual random effects
+        re_intercept = re_df.loc[animal_id, re_intercept_col]
+        re_slope = re_df.loc[animal_id, re_slope_col]
+
+        # Get random effect variances
+        re_intercept_var = cov_matrix.loc[re_intercept_col, re_intercept_col]
+        re_slope_var = cov_matrix.loc[re_slope_col, re_slope_col]
+
+        # Total Effect = Fixed + Random
+        total_intercept = fixed_intercept + re_intercept
+        total_slope = fixed_slope + re_slope
+
+        # Total SE = sqrt(Var(Fixed) + Var(Random))
+        se_intercept = np.sqrt(fixed_intercept_var + re_intercept_var)
+        se_slope = np.sqrt(fixed_slope_var + re_slope_var)
+
+        results_list.append({
+            'animal': animal_id,
+            'Intercept': total_intercept,
+            'Intercept_SE': se_intercept,
+            f'Slope_{x_col}': total_slope,
+            f'Slope_{x_col}_SE': se_slope,
+            # 95% Confidence Interval bounds (approx 1.96 * SE)
+            f'Slope_CI_lower': total_slope - (1.96 * se_slope),
+            f'Slope_CI_upper': total_slope + (1.96 * se_slope)
+        })
+
+    final_coefs = pd.DataFrame(results_list).set_index('animal')
+
+    print("\n=== Individual Animal LMEM Coefficients & Standard Errors ===")
+    print(final_coefs)
+
+    return final_coefs
+
+
+def plot_individual_regressions(df, x_col='diff_neural', y_col='diff_behavior', group_col='animal',
+                                title="Individual Animal Regressions", fname="lmem_scatter",
+                                save_path=None, side='both'):
+    """
+    Plots individual regression lines and scatter points for each animal on the same plot.
+    """
+    df_clean = df.dropna(subset=[x_col, y_col, group_col]).copy()
+
+    if df_clean.empty:
+        print("Data is empty. Cannot plot.")
+        return
+
+    plt.figure(figsize=(10, 8))
+    sns.set_context("talk")
+
+    unique_groups = df_clean[group_col].unique()
+    colors = sns.color_palette("Set2", len(unique_groups))
+
+    # Plot a regression line and scatter for each animal individually
+    for idx, group_val in enumerate(unique_groups):
+        group_data = df_clean[df_clean[group_col] == group_val]
+
+        sns.regplot(
+            data=group_data,
+            x=x_col,
+            y=y_col,
+            scatter=True,
+            ci=None,  # Set to 95 if you want confidence intervals for each line
+            color=colors[idx],
+            label=group_val,
+            scatter_kws={'s': 80, 'alpha': 0.6},
+            line_kws={'linewidth': 2.5, 'alpha': 0.9}
+        )
+
+    plt.title(f"{title} ({side})")
+    plt.xlabel(f"$\\Delta$ DA Peak (H - L)" if x_col == 'diff_neural' else x_col)
+    plt.ylabel(f"$\\Delta$ Stay Duration (H - L)" if y_col == 'diff_behavior' else y_col)
+
+    # Place legend outside the plot
+    plt.legend(title="Animal", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+        full_save_path = os.path.join(save_path, f"{fname}_{side}.png")
+        plt.savefig(full_save_path, dpi=300)
+        print(f"Saved LMEM figure to: {full_save_path}")
+
+    plt.show()
 
 def run_context_sensitivity_analysis(side='both'):
     if not side in ['ipsi', 'contra']:
@@ -132,11 +286,44 @@ def run_context_sensitivity_analysis(side='both'):
             plt.savefig(os.path.join(save_path, f"{fname}{suffix}.png"))
         plt.show()
 
+    # Run the LMEM: Does session-by-session Neural difference predict Behavioral difference?
+    lmem_result = run_lmem_analysis(
+        df_master,
+        x_col='diff_neural',
+        y_col='diff_behavior',
+        group_col='animal'
+    )
+    final_coeffs = get_individual_lmem_coefs(lmem_result)
+
+    # Plot the random effects visualization (Individual regressions)
+    plot_individual_regressions(
+        df_master,
+        x_col='diff_neural',
+        y_col='diff_behavior',
+        group_col='animal',
+        title="Session-level LMEM: Behavior vs Neural",
+        fname="lmem_session_regressions",
+        save_path=save_path,
+        side=side
+    )
+
+    # Optional: You can do the exact same thing for your lagged models!
+    lagged_coef = run_lmem_analysis(df_master, x_col='neural_prev', y_col='diff_behavior')
+    plot_individual_regressions(
+        df_master,
+        x_col='neural_prev',
+        y_col='diff_behavior',
+        title="Lagged LMEM: Neural(i-1) vs Behav(i)",
+        fname="lmem_lagged_behav_precede_neural",
+        save_path=save_path,
+        side=side
+    )
+
     # Execute Plots
     plot_and_save(df_animal, 'diff_behavior', 'diff_neural', 'Animal Level', 'corr_animal')
-    plot_and_save(df_master, 'diff_behavior', 'diff_neural', 'Session Level', 'corr_session')
-    plot_and_save(df_master, 'behav_prev', 'diff_neural', 'Lag: Behav(i-1) vs Neural(i)', 'corr_behav_precede_neural')
-    plot_and_save(df_master, 'diff_behavior', 'neural_prev', 'Lag: Behav(i) vs Neural(i-1)', 'corr_neural_precede_behav')
+    # plot_and_save(df_master, 'diff_behavior', 'diff_neural', 'Session Level', 'corr_session')
+    # plot_and_save(df_master, 'behav_prev', 'diff_neural', 'Lag: Behav(i-1) vs Neural(i)', 'corr_behav_precede_neural')
+    # plot_and_save(df_master, 'diff_behavior', 'neural_prev', 'Lag: Behav(i) vs Neural(i-1)', 'corr_neural_precede_behav')
 
     # print(f"Analysis for '{side}' completed. Figures saved to {save_path}.")
 
@@ -452,6 +639,6 @@ def plot_animal_hemis_context_sensitivity_regressions(window_width=2.0):
     plt.show()
 
 if __name__ == "__main__":
-    # run_context_sensitivity_analysis(side='both')
-    run_binned_context_analysis(side='ipsi')
+    run_context_sensitivity_analysis(side='both')
+    # run_binned_context_analysis(side='both')
     # plot_animal_hemis_context_sensitivity_regressions(window_width=2)

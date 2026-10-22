@@ -20,6 +20,8 @@ def run_lmem_analysis(master_df):
     # --- Step 1: Data Preparation ---
     # Filter and copy to avoid SettingWithCopyWarning
     df = master_df[(master_df['IRI'] > 1)].copy()
+    df['event_timer'] = df['IRI']
+    df.loc[df['NRI'] < df['IRI'], 'event_timer'] = df['NRI']
 
     # Create compound identifier for nested random effects if needed (though strict animal grouping is used below)
     df['animal_hemisphere'] = df['animal'].astype(str) + '_' + df['hemisphere'].astype(str)
@@ -27,9 +29,10 @@ def run_lmem_analysis(master_df):
     # Log transform
     df['logNRI'] = np.log(df['NRI'])
     df['logIRI'] = np.log(df['IRI'])
+    df['logevent_timer'] = np.log(df['event_timer'])
 
     # Standardize regressors
-    for col in ['logNRI', 'logIRI']:
+    for col in ['logNRI', 'logIRI', 'logevent_timer']:
         mean = df[col].mean()
         std = df[col].std()
         df[f'{col}_std'] = (df[col] - mean) / std
@@ -47,7 +50,7 @@ def run_lmem_analysis(master_df):
         "1 + "  # Random Intercept
         "logNRI_std + "  # Random Slope for NRI (Time)
         "logIRI_std + "  # Random Slope for IRI
-        "C(block, Treatment(reference='0.8'))"  # Random Slope for Context
+        "C(block, Treatment('0.8'))"  # Random Slope for Context
     )
 
     print("Fitting LMEM... this may take a moment.")
@@ -204,6 +207,7 @@ def figg_LMEM_coefficients_v3(model_results, axes=None):
         'C(block, Treatment(\'0.8\'))[T.0.4]': 'context',
         'logNRI_std': 'time',
         'logIRI_std': 'IRI',
+        # 'logevent_timer_std': 'IRI',
         'C(side_relative, Treatment(\'ipsi\'))[T.contra]': 'side',
     }
 
@@ -369,6 +373,7 @@ def plot_animal_coefficients(model_results, df, regressor_name, display_name, xl
     common_shift = 0.5 * fixed_block_int
 
     target_order = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043", "RK007", "RK008"]
+    # target_order = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043"]
     name_map = {k: f"Animal {i + 1}" for i, k in enumerate(target_order)}
     # name_map.update({k: k for k in target_order})  # Fallback
 
@@ -478,7 +483,7 @@ def setup_axes():
     ax_summary_side = fig.add_subplot(gs_top[1])
 
     # 3. Bottom Row Grid (Nested): 3 Columns (Width Ratio 3:3:1)
-    gs_bottom = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=outer_gs[1], width_ratios=[3, 1, 3])
+    gs_bottom = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=outer_gs[1], width_ratios=[8, 5, 8])
     ax_time = fig.add_subplot(gs_bottom[0])
     ax_iri = fig.add_subplot(gs_bottom[2])
     ax_context = fig.add_subplot(gs_bottom[1])
@@ -529,17 +534,19 @@ def main():
                                                                 file_format='parquet')
     master_DA_features_df = pd.concat([master_df1, master_df2], ignore_index=True)
     model_results, master_df = run_lmem_analysis(master_DA_features_df)
+    # model_results, master_df = run_lmem_analysis(master_df1)
     tic = time.time()
     fig, axes = setup_axes()
     figg_LMEM_coefficients_v3(model_results, axes=axes['summary_main'])
     plot_single_marginal_coeff(model_results, 'C(side_relative, Treatment(\'ipsi\'))[T.contra]', 'side',
                                ax=axes['summary_side'])
-    plot_animal_coefficients(model_results, master_df, regressor_name='logNRI_std', display_name='Time of Reward Delivery',
+    plot_animal_coefficients(model_results, master_df, regressor_name='logNRI_std',
+                             display_name='Time of Reward Delivery',
                              xlim=[-0.15, 0.65], ax=axes['time'])
     plot_animal_coefficients(model_results, master_df, regressor_name='logIRI_std', display_name='IRI',
                              xlim=[-0.15, 0.65], ax=axes['iri'])
     plot_animal_coefficients(model_results, master_df, regressor_name='C(block, Treatment(\'0.8\'))[T.0.4]',
-                             display_name='Context', xlim=[-0.05, 0.25], ax=axes['context'])
+                             display_name='Context', xlim=[-0.15, 0.35], ax=axes['context'])
 
     c_ipsi = sns.color_palette("Paired")[1]
     c_contra = sns.color_palette("Paired")[5]

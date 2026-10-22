@@ -850,10 +850,18 @@ def main():
     #
     save_path = os.path.join(config.MAIN_DATA_ROOT, config.THESIS_FIGURE_SUBDIR, 'fig_3-1_behavior_composite.png')
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    print(f"Saved to {save_path}")
+    # plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    # print(f"Saved to {save_path}")
     plt.show()
 
 
 if __name__ == '__main__':
     main()
+    # animal_list = animal_ids = ["SZ036", "SZ037", "SZ038", "SZ039", "SZ042", "SZ043", "RK007", "RK008"]
+    # for example_animal in animal_list:
+    #     fig, axes_met = plt.subplots(nrows=1, ncols=4, figsize=(16, 4))
+    #     plot_metrics_panel(axes_met, example_animal)
+    #     plt.suptitle(example_animal)
+    #     save_dir = os.path.join(config.MAIN_DATA_ROOT, config.PAPER_OUTPUT_SUBDIR, f'behavior_performance_across_sessions_{example_animal}.png')
+    #     plt.savefig(save_dir, dpi=300, bbox_inches="tight")
+    #     plt.show()
